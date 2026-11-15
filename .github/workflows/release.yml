@@ -59,7 +59,9 @@ jobs:
 
       - name: Build release APK
         working-directory: android
-        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=${ABI}
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=${ABI}
 
       - name: Rename APK with version and ABI
         run: |
