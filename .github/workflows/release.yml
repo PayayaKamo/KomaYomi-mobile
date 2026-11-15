@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    name: Build Android release APK
+    runs-on: ubuntu-latest
+    env:
+      ABI: arm64-v8a
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0" "ndk;27.1.12297006" "cmake;3.22.1"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Resolve version from package.json
+        id: version
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="v${VERSION}"
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${GITHUB_REF_NAME}" != "${TAG}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${TAG}" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=${ABI}
+
+      - name: Rename APK with version and ABI
+        run: |
+          ASSET="KomaYomi-mobile-${{ steps.version.outputs.version }}-android-${ABI}.apk"
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/${ASSET}"
+          echo "ASSET=${ASSET}" >> "$GITHUB_ENV"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KomaYomi-mobile-${{ steps.version.outputs.version }}-android-${{ env.ABI }}
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          sed -e "s/__VERSION__/${VERSION}/g" -e "s/__ABI__/${ABI}/g" .github/release-notes.md > "${RUNNER_TEMP}/release-notes.md"
+          if gh release view "${TAG}" > /dev/null 2>&1; then
+            gh release edit "${TAG}" --title "KomaYomi Mobile ${VERSION}" --notes-file "${RUNNER_TEMP}/release-notes.md"
+            gh release upload "${TAG}" "dist/${ASSET}" --clobber
+          else
+            gh release create "${TAG}" "dist/${ASSET}" \
+              --target "${GITHUB_SHA}" \
+              --title "KomaYomi Mobile ${VERSION}" \
+              --notes-file "${RUNNER_TEMP}/release-notes.md"
+          fi

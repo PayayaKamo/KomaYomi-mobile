@@ -87,6 +87,32 @@ that contains the volume folders (the same root the project was exported against
 picked SAF tree is copied by the small `KomaFiles` native module; on iOS the folder is read through
 RNFS. If the folder is skipped, the project still opens with missing-image placeholders.
 
+## Releases
+
+Releases are built by [.github/workflows/release.yml](.github/workflows/release.yml). The workflow
+runs on every `v*` tag and can also be started by hand (`workflow_dispatch`). It builds the Android
+release variant, uploads the APK as a workflow artifact, and creates or updates the GitHub Release
+with the APK attached.
+
+- Only Android artifacts are published. iOS cannot be built on GitHub-hosted runners because it
+  needs macOS plus Apple signing certificates, so iOS builds have to be produced locally with Xcode.
+- The APK is signed with the standard Android debug keystore; no keystore or password is stored in
+  this repository. Treat published APKs as testing builds, not store-ready packages.
+- The build targets `arm64-v8a` only, and the asset is named
+  `KomaYomi-mobile-<version>-android-arm64-v8a.apk`.
+- The version comes from `version` in [package.json](package.json). The tag must be `v<version>` and
+  is validated in CI, so tag, release title and asset name always match.
+
+To cut a release:
+
+```bash
+npm version 0.1.0 --no-git-tag-version
+git commit -am "Bump version to 0.1.0"
+git push
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 ## Project layout
 
 ```
