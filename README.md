@@ -1,8 +1,15 @@
 # KomaYomi Mobile
 
-Native mobile edition of KomaYomi, a manga comparison reader for reading the same pages across several
-language versions. This repository is an independent app; the desktop project and the static web
-build are not part of it.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platforms: Android and iOS](https://img.shields.io/badge/platforms-Android%20%7C%20iOS-3ddc84.svg)](#requirements)
+[![React Native](https://img.shields.io/badge/React%20Native-0.88-61dafb.svg)](https://reactnative.dev)
+
+**Read the same manga page in Japanese, Chinese and English — on your phone.**
+
+Native mobile edition of [KomaYomi](https://github.com/PayayaKamo/KomaYomi), a manga comparison
+reader for reading the same pages across several language versions. Projects open straight on the
+device, notes stay in a local database, and nothing is uploaded. This repository is an independent
+app; the desktop project and the static web build are not part of it.
 
 ## Current features (milestone 1)
 
@@ -106,4 +113,4 @@ HarmonyOS NEXT support is planned as a separate milestone using Huawei's React N
 
 ## License
 
-Same license as the KomaYomi desktop project.
+Same license as the KomaYomi desktop project: [MIT](LICENSE).
