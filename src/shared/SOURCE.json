@@ -1,0 +1,17 @@
+{
+  "syncedFrom": "C:\\Users\\zhouy\\Desktop\\manga-memo-peoject\\KomaYomi\\shared",
+  "files": [
+    "types.ts",
+    "format.ts",
+    "migrations.ts",
+    "markdown.ts",
+    "panelOrder.ts"
+  ],
+  "checksums": {
+    "types.ts": "13775 chars",
+    "format.ts": "24017 chars",
+    "migrations.ts": "5624 chars",
+    "markdown.ts": "8255 chars",
+    "panelOrder.ts": "4628 chars"
+  }
+}
