@@ -1,6 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { t } from '../i18n';
 import { colors, radius, spacing } from '../theme';
 
 export function Screen({ children }: { children: ReactNode }) {
@@ -134,6 +135,29 @@ export function Segmented<T extends string>({
   );
 }
 
+/** Compact edit/read switch; the read side is advisory only on mobile. */
+export function ModeButton({
+  readOnly,
+  onToggle,
+}: {
+  readOnly: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onToggle}
+      style={[styles.modeButton, readOnly ? styles.modeButtonRead : styles.modeButtonEdit]}
+      accessibilityRole="button"
+      accessibilityLabel={t('mode.toggle')}
+      accessibilityState={{ selected: readOnly }}>
+      <View style={[styles.modeDot, readOnly ? styles.modeDotRead : styles.modeDotEdit]} />
+      <Text style={[styles.modeLabel, readOnly ? styles.modeLabelRead : styles.modeLabelEdit]}>
+        {readOnly ? t('mode.readShort') : t('mode.editShort')}
+      </Text>
+    </Pressable>
+  );
+}
+
 export function Badge({ label, tone = 'muted' }: { label: string; tone?: 'muted' | 'accent' | 'warning' }) {
   return (
     <View style={[styles.badge, tone === 'accent' && styles.badgeAccent, tone === 'warning' && styles.badgeWarning]}>
@@ -231,6 +255,23 @@ const styles = StyleSheet.create({
   segmentActive: { backgroundColor: colors.accentSoft },
   segmentLabel: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
   segmentLabelActive: { color: colors.text },
+  modeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  modeButtonEdit: { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+  modeButtonRead: { backgroundColor: '#2b2417', borderColor: colors.warning },
+  modeDot: { width: 6, height: 6, borderRadius: 3 },
+  modeDotEdit: { backgroundColor: colors.success },
+  modeDotRead: { backgroundColor: colors.warning },
+  modeLabel: { fontSize: 11, fontWeight: '700' },
+  modeLabelEdit: { color: colors.textMuted },
+  modeLabelRead: { color: colors.warning },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,

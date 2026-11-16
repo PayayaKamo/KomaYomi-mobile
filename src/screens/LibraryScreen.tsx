@@ -3,15 +3,26 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ChapterEntry, StoredProject } from '../types/project';
 import { t } from '../i18n';
 import { langShort } from '../shared/types';
-import { Badge, Banner, Chip, Header, Screen } from '../components/ui';
+import {
+  Badge,
+  Banner,
+  Chip,
+  Header,
+  ModeButton,
+  Screen,
+} from '../components/ui';
 import { colors, radius, spacing } from '../theme';
 
 export function LibraryScreen({
   project,
+  readOnly,
+  onModeChange,
   onBack,
   onOpenChapter,
 }: {
   project: StoredProject;
+  readOnly: boolean;
+  onModeChange: (mode: 'edit' | 'read') => void;
   onBack: () => void;
   onOpenChapter: (volumeId: string, chapterId: string) => void;
 }) {
@@ -22,12 +33,19 @@ export function LibraryScreen({
         subtitle={project.storageMode === 'packaged' ? t('home.packaged') : t('home.reference')}
         onBack={onBack}
         right={
-          <Badge
-            label={t('home.volumes', { count: project.library.volumes.length })}
-            tone={project.storageMode === 'packaged' ? 'accent' : 'muted'}
-          />
+          <>
+            <ModeButton
+              readOnly={readOnly}
+              onToggle={() => onModeChange(readOnly ? 'edit' : 'read')}
+            />
+            <Badge
+              label={t('home.volumes', { count: project.library.volumes.length })}
+              tone={project.storageMode === 'packaged' ? 'accent' : 'muted'}
+            />
+          </>
         }
       />
+      {readOnly ? <Banner text={t('mode.readOnlyHint')} /> : null}
       {project.warnings.length ? <Banner text={project.warnings.join('\n')} /> : null}
       <ScrollView contentContainerStyle={styles.content}>
         {project.library.volumes.map((volume) => (

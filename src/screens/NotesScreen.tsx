@@ -10,7 +10,13 @@ import {
 import type { StoredProject } from '../types/project';
 import { t } from '../i18n';
 import { getNote, saveNote } from '../lib/db';
-import { Button, Header, Screen } from '../components/ui';
+import {
+  Banner,
+  Button,
+  Header,
+  ModeButton,
+  Screen,
+} from '../components/ui';
 import { colors, radius, spacing } from '../theme';
 
 export function NotesScreen({
@@ -18,12 +24,16 @@ export function NotesScreen({
   volumeId,
   chapterId,
   pageIndex,
+  readOnly,
+  onModeChange,
   onBack,
 }: {
   project: StoredProject;
   volumeId: string;
   chapterId: string;
   pageIndex: number;
+  readOnly: boolean;
+  onModeChange: (mode: 'edit' | 'read') => void;
   onBack: () => void;
 }) {
   const volume = project.library.volumes.find((item) => item.id === volumeId);
@@ -48,14 +58,14 @@ export function NotesScreen({
     });
     return () => {
       alive = false;
-      if (dirty.current) {
+      if (!readOnly && dirty.current) {
         saveNote(project.id, volumeId, chapterId, pageIndex, latest.current).catch(() => undefined);
       }
     };
-  }, [project.id, volumeId, chapterId, pageIndex]);
+  }, [project.id, volumeId, chapterId, pageIndex, readOnly]);
 
   useEffect(() => {
-    if (!loaded || text === saved) return undefined;
+    if (readOnly || !loaded || text === saved) return undefined;
     const timer = setTimeout(() => {
       setSaving(true);
       saveNote(project.id, volumeId, chapterId, pageIndex, text)
@@ -64,7 +74,7 @@ export function NotesScreen({
         .finally(() => setSaving(false));
     }, 700);
     return () => clearTimeout(timer);
-  }, [text, saved, loaded, project.id, volumeId, chapterId, pageIndex]);
+  }, [text, saved, loaded, readOnly, project.id, volumeId, chapterId, pageIndex]);
 
   const subtitle = useMemo(
     () =>
@@ -77,7 +87,7 @@ export function NotesScreen({
   );
 
   const flush = async () => {
-    if (!loaded || text === saved) return;
+    if (readOnly || !loaded || text === saved) return;
     setSaving(true);
     try {
       await saveNote(project.id, volumeId, chapterId, pageIndex, text);
@@ -89,7 +99,18 @@ export function NotesScreen({
 
   return (
     <Screen>
-      <Header title={t('notes.title')} subtitle={subtitle} onBack={onBack} />
+      <Header
+        title={t('notes.title')}
+        subtitle={subtitle}
+        onBack={onBack}
+        right={
+          <ModeButton
+            readOnly={readOnly}
+            onToggle={() => onModeChange(readOnly ? 'edit' : 'read')}
+          />
+        }
+      />
+      {readOnly ? <Banner text={t('mode.readOnlyHint')} /> : null}
       <KeyboardAvoidingView
         style={styles.body}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -101,15 +122,27 @@ export function NotesScreen({
           placeholder={t('notes.placeholder')}
           placeholderTextColor={colors.textMuted}
           multiline
+          editable={!readOnly}
           textAlignVertical="top"
           autoCapitalize="sentences"
-          style={styles.input}
+          style={[styles.input, readOnly && styles.inputReadOnly]}
         />
         <View style={styles.footer}>
           <Text style={styles.status}>
-            {saving ? t('common.loading') : loaded && text !== saved ? t('notes.unsaved') : t('notes.saved')}
+            {readOnly
+              ? t('mode.readOnlyStatus')
+              : saving
+                ? t('common.loading')
+                : loaded && text !== saved
+                  ? t('notes.unsaved')
+                  : t('notes.saved')}
           </Text>
-          <Button label={t('notes.save')} onPress={flush} busy={saving} />
+          <Button
+            label={saved.trim() ? t('notes.update') : t('notes.add')}
+            onPress={flush}
+            busy={saving}
+            disabled={readOnly}
+          />
         </View>
         <Text style={styles.hint}>{t('notes.hint')}</Text>
       </KeyboardAvoidingView>
@@ -131,6 +164,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
+  inputReadOnly: { opacity: 0.7 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   status: { color: colors.textMuted, fontSize: 12, flex: 1 },
   hint: { color: colors.textMuted, fontSize: 11, textAlign: 'center' },

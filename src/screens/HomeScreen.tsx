@@ -4,7 +4,14 @@ import type { StoredProject } from '../types/project';
 import { formatDate, t } from '../i18n';
 import { hasBundledAsset, removeDirectory } from '../lib/files';
 import { importBundledSample, importPickedProject, type ImportPhase } from '../lib/projectImport';
-import { Badge, Banner, Button, EmptyState, Screen } from '../components/ui';
+import {
+  Badge,
+  Banner,
+  Button,
+  EmptyState,
+  ModeButton,
+  Screen,
+} from '../components/ui';
 import { colors, radius, spacing } from '../theme';
 import { deleteProjectRecord } from '../lib/db';
 
@@ -30,11 +37,15 @@ const phaseLabel = (phase: ImportPhase): string => {
 
 export function HomeScreen({
   projects,
+  readOnly,
+  onModeChange,
   onOpen,
   onImported,
   onDelete,
 }: {
   projects: StoredProject[];
+  readOnly: boolean;
+  onModeChange: (mode: 'edit' | 'read') => void;
   onOpen: (project: StoredProject) => void;
   onImported: (project: StoredProject) => void;
   onDelete: (project: StoredProject) => void;
@@ -48,7 +59,7 @@ export function HomeScreen({
   }, []);
 
   const runImport = async (sample: boolean) => {
-    if (busy) return;
+    if (busy || readOnly) return;
     setError(null);
     setBusy(t('home.importing'));
     try {
@@ -83,16 +94,28 @@ export function HomeScreen({
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <Text style={styles.brand}>{t('app.name')}</Text>
+          <View style={styles.heroTop}>
+            <Text style={styles.brand}>{t('app.name')}</Text>
+            <ModeButton
+              readOnly={readOnly}
+              onToggle={() => onModeChange(readOnly ? 'edit' : 'read')}
+            />
+          </View>
           <Text style={styles.tagline}>{t('app.tagline')}</Text>
         </View>
 
+        {readOnly ? <Banner text={t('mode.readOnlyHint')} /> : null}
         {error ? <Banner text={error} tone="error" /> : null}
 
         <View style={styles.actions}>
-          <Button label={t('home.openProject')} onPress={() => runImport(false)} busy={Boolean(busy)} />
+          <Button
+            label={t('home.openProject')}
+            onPress={() => runImport(false)}
+            busy={Boolean(busy)}
+            disabled={readOnly}
+          />
           {Platform.OS === 'android' && sampleAvailable ? (
-            <Button label={t('home.openSample')} variant="secondary" onPress={() => runImport(true)} disabled={Boolean(busy)} />
+            <Button label={t('home.openSample')} variant="secondary" onPress={() => runImport(true)} disabled={readOnly || Boolean(busy)} />
           ) : null}
         </View>
 
@@ -125,9 +148,11 @@ export function HomeScreen({
               ) : null}
               <View style={styles.cardActions}>
                 <Text style={styles.openHint}>{t('library.chapters')} ›</Text>
-                <Pressable onPress={() => confirmDelete(project)} hitSlop={8}>
-                  <Text style={styles.delete}>{t('common.delete')}</Text>
-                </Pressable>
+                {readOnly ? null : (
+                  <Pressable onPress={() => confirmDelete(project)} hitSlop={8}>
+                    <Text style={styles.delete}>{t('common.delete')}</Text>
+                  </Pressable>
+                )}
               </View>
             </Pressable>
           ))
@@ -140,6 +165,12 @@ export function HomeScreen({
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
   hero: { paddingTop: spacing.lg, paddingBottom: spacing.md, gap: spacing.xs },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
   brand: { color: colors.text, fontSize: 32, fontWeight: '800', letterSpacing: -0.5 },
   tagline: { color: colors.textMuted, fontSize: 14 },
   actions: { gap: spacing.sm },

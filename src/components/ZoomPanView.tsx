@@ -1,24 +1,37 @@
 import React, { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { GestureDetector, usePanGesture, usePinchGesture, useSimultaneousGestures, useTapGesture } from 'react-native-gesture-handler';
+import {
+  GestureDetector,
+  usePanGesture,
+  usePinchGesture,
+  useSimultaneousGestures,
+  useTapGesture,
+} from 'react-native-gesture-handler';
 
 type Transform = { x: number; y: number; scale: number };
 
 /**
- * Pan/pinch surface shared by both compare modes. The transform is driven by
- * Animated values updated synchronously in the gesture callbacks, so the page
- * follows the finger without waiting for a React re-render.
+ * Pan/pinch surface shared by the compare, original and panel views. The
+ * transform is driven by Animated values updated synchronously in the gesture
+ * callbacks, so the page follows the finger without waiting for a React
+ * re-render.
  */
 export function ZoomPanView({
   children,
   resetKey,
   panEnabled = true,
   onZoomChange,
+  onScaleChange,
+  onDoubleTap,
 }: {
   children: ReactNode;
   resetKey: string;
   panEnabled?: boolean;
   onZoomChange?: (zoomed: boolean) => void;
+  /** Current scale, reported at two decimals so parents can show the ratio. */
+  onScaleChange?: (scale: number) => void;
+  /** Replaces the default double-tap-to-reset, e.g. to open the panel detail. */
+  onDoubleTap?: () => void;
 }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -27,11 +40,21 @@ export function ZoomPanView({
   const start = useRef<Transform>({ x: 0, y: 0, scale: 1 });
   const current = useRef<Transform>({ x: 0, y: 0, scale: 1 });
   const zoomedRef = useRef(false);
+  const reportedScale = useRef(1);
+  const doubleTapRef = useRef(onDoubleTap);
+  doubleTapRef.current = onDoubleTap;
 
   const reportZoom = (zoomed: boolean) => {
     if (zoomedRef.current === zoomed) return;
     zoomedRef.current = zoomed;
     onZoomChange?.(zoomed);
+  };
+
+  const reportScale = (next: number) => {
+    const rounded = Math.round(next * 100) / 100;
+    if (reportedScale.current === rounded) return;
+    reportedScale.current = rounded;
+    onScaleChange?.(rounded);
   };
 
   const apply = (next: Transform) => {
@@ -40,6 +63,7 @@ export function ZoomPanView({
     translateY.setValue(next.y);
     scale.setValue(next.scale);
     reportZoom(next.scale > 1.01);
+    reportScale(next.scale);
   };
 
   useEffect(() => {
@@ -54,7 +78,7 @@ export function ZoomPanView({
     onBegin: () => {
       start.current = { ...current.current };
     },
-    onUpdate: (event) => {
+    onUpdate: event => {
       apply({
         x: start.current.x + event.translationX,
         y: start.current.y + event.translationY,
@@ -67,7 +91,7 @@ export function ZoomPanView({
     onBegin: () => {
       start.current = { ...current.current };
     },
-    onUpdate: (event) => {
+    onUpdate: event => {
       apply({
         x: current.current.x,
         y: current.current.y,
@@ -79,13 +103,30 @@ export function ZoomPanView({
   const doubleTap = useTapGesture({
     numberOfTaps: 2,
     onActivate: () => {
+      if (doubleTapRef.current) {
+        doubleTapRef.current();
+        return;
+      }
       Animated.parallel([
-        Animated.timing(translateX, { toValue: 0, duration: 160, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 160, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 160, useNativeDriver: true }),
+        Animated.timing(translateX, {
+          toValue: 0,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 160,
+          useNativeDriver: true,
+        }),
       ]).start(() => {
         current.current = { x: 0, y: 0, scale: 1 };
         reportZoom(false);
+        reportScale(1);
       });
     },
   });
@@ -100,7 +141,8 @@ export function ZoomPanView({
             style={[
               StyleSheet.absoluteFill,
               { transform: [{ translateX }, { translateY }, { scale }] },
-            ]}>
+            ]}
+          >
             {children}
           </Animated.View>
         </GestureDetector>

@@ -1,4 +1,10 @@
-import type { Note, NoteImage, NoteSource, Panel, PanelRect, ReadingDirection } from '../shared/types';
+import type {
+  Note,
+  NoteImage,
+  NoteSource,
+  Panel,
+  PanelRect,
+} from '../shared/types';
 
 /**
  * Pure panel geometry, vendored from the desktop app (`src/lib/geometry.ts`).
@@ -68,43 +74,9 @@ export function splitRect(rect: PanelRect, orientation: 'v' | 'h', cuts: number[
   return pieces;
 }
 
-function median(nums: number[]): number {
-  if (!nums.length) return 0;
-  const s = [...nums].sort((a, b) => a - b);
-  return s[Math.floor(s.length / 2)];
-}
-
 /** Freeze a sequence into explicit 1..N numbers. */
 export function renumberPanels(panels: Panel[]): Panel[] {
   return panels.map((panel, index) => ({ ...panel, number: index + 1 }));
-}
-
-/** Reading order matching the desktop app: rtl rows right-to-left, ttb columns right-to-left. */
-export function sortPanels(panels: Panel[], dir: ReadingDirection): Panel[] {
-  if (panels.length < 2) return panels;
-  if (panels.some((p) => typeof p.number === 'number')) {
-    return [...panels].sort((a, b) => (a.number ?? Number.MAX_SAFE_INTEGER) - (b.number ?? Number.MAX_SAFE_INTEGER));
-  }
-  if (dir === 'ttb') {
-    const mw = median(panels.map((p) => p.rect.w)) || 0.2;
-    const cols: Panel[][] = [];
-    for (const p of [...panels].sort((a, b) => b.rect.x + b.rect.w / 2 - (a.rect.x + a.rect.w / 2))) {
-      const cx = p.rect.x + p.rect.w / 2;
-      const group = cols.find((g) => Math.abs(g[0].rect.x + g[0].rect.w / 2 - cx) < mw * 0.6);
-      if (group) group.push(p);
-      else cols.push([p]);
-    }
-    return cols.flatMap((g) => [...g].sort((a, b) => a.rect.y - b.rect.y));
-  }
-  const mh = median(panels.map((p) => p.rect.h)) || 0.2;
-  const rows: Panel[][] = [];
-  for (const p of [...panels].sort((a, b) => a.rect.y + a.rect.h / 2 - (b.rect.y + b.rect.h / 2))) {
-    const cy = p.rect.y + p.rect.h / 2;
-    const group = rows.find((g) => Math.abs(g[0].rect.y + g[0].rect.h / 2 - cy) < mh * 0.6);
-    if (group) group.push(p);
-    else rows.push([p]);
-  }
-  return rows.flatMap((g) => [...g].sort((a, b) => (dir === 'rtl' ? b.rect.x - a.rect.x : a.rect.x - b.rect.x)));
 }
 
 export const uid = (prefix: string) => `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

@@ -1,9 +1,11 @@
+/* eslint-disable react-native/no-inline-styles -- alignment transforms are per-page data */
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { AlignOffset, Lang, PageEntry } from '../shared/types';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { AlignOffset, Lang, PageEntry, PanelRect } from '../shared/types';
 import { DEFAULT_OFFSET } from '../shared/types';
 import { fileUri } from '../lib/files';
 import { langName, langShort } from '../shared/types';
+import { PanelImage } from './PanelImage';
 import { colors, radius, spacing } from '../theme';
 
 export type CompareMode = 'split' | 'overlay';
@@ -15,6 +17,8 @@ type Props = {
   maskEnabled: boolean;
   masked: Record<string, boolean>;
   offsets: Partial<Record<Lang, AlignOffset>>;
+  /** Normalized panel rectangle to crop to; null shows the whole page. */
+  panel: PanelRect | null;
   width: number;
   height: number;
   onToggleMask: (lang: Lang) => void;
@@ -28,6 +32,7 @@ export function ComparePage({
   maskEnabled,
   masked,
   offsets,
+  panel,
   width,
   height,
   onToggleMask,
@@ -38,28 +43,28 @@ export function ComparePage({
       <View style={styles.canvas}>
         {mode === 'split' ? (
           <View style={styles.row}>
-            {languages.map((lang) => {
+            {languages.map(lang => {
               const file = page.files[lang];
               const isMasked = maskEnabled && Boolean(masked[lang]);
               return (
                 <View key={lang} style={styles.column}>
                   {file ? (
-                    <Image
-                      source={{ uri: fileUri(file) }}
-                      style={styles.image}
-                      resizeMode="contain"
-                      fadeDuration={0}
-                    />
+                    <PanelImage uri={fileUri(file)} rect={panel} />
                   ) : (
                     <View style={styles.missing}>
                       <Text style={styles.missingText}>{missingLabel}</Text>
                     </View>
                   )}
                   <View style={styles.columnLabel}>
-                    <Text style={styles.columnLabelText}>{langShort(lang)}</Text>
+                    <Text style={styles.columnLabelText}>
+                      {langShort(lang)}
+                    </Text>
                   </View>
                   {isMasked ? (
-                    <Pressable style={styles.mask} onPress={() => onToggleMask(lang)}>
+                    <Pressable
+                      style={styles.mask}
+                      onPress={() => onToggleMask(lang)}
+                    >
                       <Text style={styles.maskTitle}>{langName(lang)}</Text>
                       <Text style={styles.maskHint}>{langShort(lang)}</Text>
                     </Pressable>
@@ -75,6 +80,7 @@ export function ComparePage({
             maskEnabled={maskEnabled}
             masked={masked}
             offsets={offsets}
+            panel={panel}
             width={width}
             height={height}
             missingLabel={missingLabel}
@@ -91,11 +97,14 @@ function Overlay({
   maskEnabled,
   masked,
   offsets,
+  panel,
   width,
   height,
   missingLabel,
 }: Omit<Props, 'mode' | 'onToggleMask'>) {
-  const visible = languages.filter((lang) => Boolean(page.files[lang]) && !(maskEnabled && masked[lang]));
+  const visible = languages.filter(
+    lang => Boolean(page.files[lang]) && !(maskEnabled && masked[lang]),
+  );
   if (!visible.length) {
     return (
       <View style={styles.missing}>
@@ -121,13 +130,18 @@ function Overlay({
                   { scale: offset.scale || 1 },
                 ],
               },
-            ]}>
-            <Image source={{ uri: fileUri(file) }} style={styles.image} resizeMode="contain" fadeDuration={0} />
+            ]}
+          >
+            <PanelImage
+              uri={fileUri(file)}
+              rect={panel}
+              style={StyleSheet.absoluteFill}
+            />
           </View>
         );
       })}
       <View style={styles.overlayBadges}>
-        {visible.map((lang) => (
+        {visible.map(lang => (
           <View key={lang} style={styles.overlayBadge}>
             <Text style={styles.overlayBadgeText}>{langShort(lang)}</Text>
           </View>
@@ -140,9 +154,17 @@ function Overlay({
 const styles = StyleSheet.create({
   canvas: { flex: 1, backgroundColor: '#05070a' },
   row: { flex: 1, flexDirection: 'row' },
-  column: { flex: 1, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
-  image: { flex: 1, width: '100%' },
-  missing: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.md },
+  column: {
+    flex: 1,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: colors.border,
+  },
+  missing: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
   missingText: { color: colors.textMuted, fontSize: 12 },
   columnLabel: {
     position: 'absolute',
@@ -153,7 +175,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     backgroundColor: 'rgba(8, 11, 16, 0.72)',
   },
-  columnLabelText: { color: colors.text, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  columnLabelText: {
+    color: colors.text,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   mask: {
     position: 'absolute',
     top: 0,
@@ -166,7 +193,12 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   maskTitle: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
-  maskHint: { color: colors.border, fontSize: 28, fontWeight: '800', letterSpacing: 2 },
+  maskHint: {
+    color: colors.border,
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: 2,
+  },
   overlayBadges: {
     position: 'absolute',
     left: spacing.sm,
@@ -180,5 +212,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     backgroundColor: 'rgba(8, 11, 16, 0.72)',
   },
-  overlayBadgeText: { color: colors.textMuted, fontSize: 10, fontWeight: '700' },
+  overlayBadgeText: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+  },
 });
