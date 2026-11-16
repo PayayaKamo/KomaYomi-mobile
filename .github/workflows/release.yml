@@ -15,10 +15,12 @@ concurrency:
 
 jobs:
   android:
-    name: Build Android release APK
+    name: Build Android release artifacts
     runs-on: ubuntu-latest
     env:
-      ABI: arm64-v8a
+      # Architectures shipped in the APKs and the AAB. 32-bit x86 is not built.
+      ABIS: armeabi-v7a,arm64-v8a,x86_64
+      SPLIT_ABIS: armeabi-v7a arm64-v8a x86_64
     steps:
       - uses: actions/checkout@v4
 
@@ -57,24 +59,42 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
-      - name: Build release APK
+      - name: Build universal APK
         working-directory: android
         run: |
           chmod +x ./gradlew
-          ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=${ABI}
+          ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures="$ABIS"
+          mkdir -p ../dist
+          cp app/build/outputs/apk/release/app-release.apk \
+            "../dist/KomaYomi-mobile-${{ steps.version.outputs.version }}-android-universal.apk"
 
-      - name: Rename APK with version and ABI
+      - name: Build per-ABI APKs
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          ASSET="KomaYomi-mobile-${{ steps.version.outputs.version }}-android-${ABI}.apk"
-          mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk "dist/${ASSET}"
-          echo "ASSET=${ASSET}" >> "$GITHUB_ENV"
+          chmod +x android/gradlew
+          for ABI in $SPLIT_ABIS; do
+            (cd android && ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures="$ABI")
+            cp android/app/build/outputs/apk/release/app-release.apk \
+              "dist/KomaYomi-mobile-${VERSION}-android-${ABI}.apk"
+          done
 
-      - name: Upload workflow artifact
+      - name: Build AAB for store upload
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          (cd android && ./gradlew :app:bundleRelease --no-daemon -PreactNativeArchitectures="$ABIS")
+          cp android/app/build/outputs/bundle/release/app-release.aab \
+            "dist/KomaYomi-mobile-${VERSION}-android.aab"
+
+      - name: List artifacts and sizes
+        run: ls -lh dist
+
+      - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: KomaYomi-mobile-${{ steps.version.outputs.version }}-android-${{ env.ABI }}
-          path: dist/*.apk
+          name: KomaYomi-mobile-${{ steps.version.outputs.version }}-android
+          path: dist/*
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -83,12 +103,20 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          sed -e "s/__VERSION__/${VERSION}/g" -e "s/__ABI__/${ABI}/g" .github/release-notes.md > "${RUNNER_TEMP}/release-notes.md"
+          size() { du -h "dist/$1" | cut -f1; }
+          sed \
+            -e "s/__VERSION__/${VERSION}/g" \
+            -e "s/__SIZE_UNIVERSAL__/$(size "KomaYomi-mobile-${VERSION}-android-universal.apk")/g" \
+            -e "s/__SIZE_ARM64__/$(size "KomaYomi-mobile-${VERSION}-android-arm64-v8a.apk")/g" \
+            -e "s/__SIZE_ARMV7__/$(size "KomaYomi-mobile-${VERSION}-android-armeabi-v7a.apk")/g" \
+            -e "s/__SIZE_X86_64__/$(size "KomaYomi-mobile-${VERSION}-android-x86_64.apk")/g" \
+            -e "s/__SIZE_AAB__/$(size "KomaYomi-mobile-${VERSION}-android.aab")/g" \
+            .github/release-notes.md > "${RUNNER_TEMP}/release-notes.md"
           if gh release view "${TAG}" > /dev/null 2>&1; then
             gh release edit "${TAG}" --title "KomaYomi Mobile ${VERSION}" --notes-file "${RUNNER_TEMP}/release-notes.md"
-            gh release upload "${TAG}" "dist/${ASSET}" --clobber
+            gh release upload "${TAG}" dist/* --clobber
           else
-            gh release create "${TAG}" "dist/${ASSET}" \
+            gh release create "${TAG}" dist/* \
               --target "${GITHUB_SHA}" \
               --title "KomaYomi Mobile ${VERSION}" \
               --notes-file "${RUNNER_TEMP}/release-notes.md"

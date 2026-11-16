@@ -75,7 +75,9 @@ to the device and choose **Open project…**.
 ### Android device or emulator
 
 Start an AVD in Android Studio (or connect a device with USB debugging enabled), confirm it is
-visible with `adb devices`, then run `npm run android`. The build targets `arm64-v8a`.
+visible with `adb devices`, then run `npm run android`. Debug builds use the ABI list in
+`android/gradle.properties`; release builds ship `arm64-v8a`, `armeabi-v7a` and `x86_64` (see
+[Releases](#releases)).
 
 ### iOS
 
@@ -178,27 +180,38 @@ RNFS. If the folder is skipped, the project still opens with missing-image place
 ### Releases
 
 Releases are built by [.github/workflows/release.yml](.github/workflows/release.yml). The workflow
-runs on every `v*` tag and can also be started by hand (`workflow_dispatch`). It builds the Android
-release variant, uploads the APK as a workflow artifact, and creates or updates the GitHub Release
-with the APK attached.
+runs on every `v*` tag and can also be started by hand (`workflow_dispatch`). It builds every Android
+release artifact, uploads them as workflow artifacts, and creates or updates the GitHub Release with
+them attached:
+
+| Artifact | Architectures | Notes |
+| --- | --- | --- |
+| `KomaYomi-mobile-<version>-android-universal.apk` | arm64-v8a + armeabi-v7a + x86_64 | One file that installs on any supported device; the largest download. |
+| `KomaYomi-mobile-<version>-android-arm64-v8a.apk` | arm64-v8a | Smallest APK for current phones and tablets. |
+| `KomaYomi-mobile-<version>-android-armeabi-v7a.apk` | armeabi-v7a | Older 32-bit ARM phones. |
+| `KomaYomi-mobile-<version>-android-x86_64.apk` | x86_64 | x86_64 emulators and Intel-based Chromebooks. |
+| `KomaYomi-mobile-<version>-android.aab` | all three | Google Play upload; not installable on a device directly. |
 
 - Only Android artifacts are published. iOS cannot be built on GitHub-hosted runners because it
   needs macOS plus Apple signing certificates, so iOS builds have to be produced locally with Xcode.
-- The APK is signed with the standard Android debug keystore; no keystore or password is stored in
-  this repository. Treat published APKs as testing builds, not store-ready packages.
-- The build targets `arm64-v8a` only, and the asset is named
-  `KomaYomi-mobile-<version>-android-arm64-v8a.apk`.
+- The React Native, Hermes and op-sqlite native libraries exist for every architecture above; 32-bit
+  x86 (`x86`) is not packaged.
+- The APKs and the AAB are signed with the standard Android debug keystore; no keystore or password is
+  stored in this repository. Treat published APKs as testing builds, not store-ready packages, and
+  note that changing the signing key breaks in-place upgrades.
 - The version comes from `version` in [package.json](package.json). The tag must be `v<version>` and
-  is validated in CI, so tag, release title and asset name always match.
+  is validated in CI, so tag, release title and artifact names always match. The Android
+  `versionCode` is derived from the same version (`major * 10000 + minor * 100 + patch`).
+- Every release's changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 To cut a release:
 
 ```bash
-npm version 0.1.0 --no-git-tag-version
-git commit -am "Bump version to 0.1.0"
+npm version 0.2.0 --no-git-tag-version
+git commit -am "Bump version to 0.2.0"
 git push
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 ### HarmonyOS NEXT
