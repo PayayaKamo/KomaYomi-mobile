@@ -17,7 +17,7 @@ const zh: Record<MessageKey, string> = {
   'home.empty': '还没有工程',
   'home.emptyHint': '打开一个 KomaYomi 工程（.mnproj）开始对照阅读。',
   'home.openProject': '打开工程…',
-  'home.openSample': '打开示例工程',
+  'home.sampleSoon': '示例工程稍后提供',
   'home.importing': '正在导入工程…',
   'home.warnings': '导入提示',
   'home.deleteTitle': '移除工程？',
@@ -27,7 +27,6 @@ const zh: Record<MessageKey, string> = {
   'home.pages': '{count} 页',
   'home.volumes': '{count} 卷',
   'home.importedAt': '导入于 {date}',
-  'home.sampleMissing': '此构建未内置示例工程。',
 
   'library.volumes': '卷',
   'library.chapters': '话',

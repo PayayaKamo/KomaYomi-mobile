@@ -38,7 +38,6 @@ independent app; the desktop edition and the browser build are separate projects
   editor is reused for new and existing notes; the action reads **Add note** or **Save changes**.
 - **Interface** in English, Simplified Chinese and Japanese, following the system language with
   English as the fallback.
-- A **demo project** is bundled in the Android build (`Open sample project`).
 
 ## What it cannot do yet
 
@@ -69,12 +68,10 @@ npm start           # terminal 1: Metro
 npm run android     # terminal 2: build and install on an emulator or device
 ```
 
-`npm run sample` regenerates the demo `.mnproj` archives; they are already committed, so this step is
-optional.
-
-On the home screen, tap **Open sample project** to import the bundled Star Cafe demo without touching
-device storage. To use your own project, copy a `.mnproj` file to the device and choose **Open
-project…**.
+On Android the home screen shows a disabled **Sample project coming soon** button next to **Open
+project…**: the previously bundled demo was removed and the slot stays as a placeholder until a new
+sample `.mnproj` ships. To use your own project, copy a `.mnproj` file to the device and choose
+**Open project…**.
 
 ### Android device or emulator
 
@@ -145,8 +142,7 @@ src/lib/panelNavigation.ts  reading-order panel stepping across pages
 src/i18n/                   en / zh / ja catalogs and locale detection
 src/screens/                home, library, page grid, reader, panel detail, page notes
 src/components/             compare/original canvases, panel crop, zoom/pan surface, UI primitives
-scripts/                    shared-code sync and sample archive generator
-samples/                    generated demo .mnproj files
+scripts/                    shared-code sync from the desktop app
 harmony/                    HarmonyOS NEXT placeholder (future milestone)
 ```
 

@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StoredProject } from '../types/project';
 import { formatDate, t } from '../i18n';
-import { hasBundledAsset, removeDirectory } from '../lib/files';
-import { importBundledSample, importPickedProject, type ImportPhase } from '../lib/projectImport';
+import { removeDirectory } from '../lib/files';
+import { importPickedProject, type ImportPhase } from '../lib/projectImport';
 import {
   Badge,
   Banner,
@@ -52,20 +52,13 @@ export function HomeScreen({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sampleAvailable, setSampleAvailable] = useState(false);
 
-  useEffect(() => {
-    hasBundledAsset('samples/star-cafe-packaged.mnproj').then(setSampleAvailable);
-  }, []);
-
-  const runImport = async (sample: boolean) => {
+  const runImport = async () => {
     if (busy || readOnly) return;
     setError(null);
     setBusy(t('home.importing'));
     try {
-      const result = sample
-        ? await importBundledSample((phase) => setBusy(phaseLabel(phase)))
-        : await importPickedProject((phase) => setBusy(phaseLabel(phase)));
+      const result = await importPickedProject((phase) => setBusy(phaseLabel(phase)));
       if (result) onImported(result.project);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
@@ -110,12 +103,13 @@ export function HomeScreen({
         <View style={styles.actions}>
           <Button
             label={t('home.openProject')}
-            onPress={() => runImport(false)}
+            onPress={() => runImport()}
             busy={Boolean(busy)}
             disabled={readOnly}
           />
-          {Platform.OS === 'android' && sampleAvailable ? (
-            <Button label={t('home.openSample')} variant="secondary" onPress={() => runImport(true)} disabled={readOnly || Boolean(busy)} />
+          {/* The bundled sample is being replaced; keep the slot until the new file ships. */}
+          {Platform.OS === 'android' ? (
+            <Button label={t('home.sampleSoon')} variant="secondary" onPress={() => undefined} disabled />
           ) : null}
         </View>
 

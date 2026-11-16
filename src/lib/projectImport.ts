@@ -6,7 +6,7 @@ import { migrateManifestV0, migratePageV0 } from '../shared/migrations';
 import type { LibraryConfig, ManifestImage, ProjectManifest, StoredImage } from '../types/project';
 import { buildLibrary } from './library';
 import { base64ToBytes, bytesToBase64 } from './base64';
-import { copyImageDirectory, fileUri, projectDirectory, readBundledAsset, ensureDir, writeBase64File } from './files';
+import { copyImageDirectory, fileUri, projectDirectory, ensureDir, writeBase64File } from './files';
 import { insertImages, insertPages, insertProject } from './db';
 
 export type ImportPhase = 'reading' | 'extracting' | 'images' | 'saving';
@@ -349,15 +349,6 @@ export async function importPickedProject(
   if (prepared.storageMode === 'reference') {
     await attachReferenceFolder(prepared, onProgress);
   }
-  return finalizePreparedProject(prepared, onProgress);
-}
-
-/** Import the demo project bundled in the Android APK assets. */
-export async function importBundledSample(
-  onProgress: ImportProgress = () => undefined,
-): Promise<import('../types/project').ImportResult> {
-  const base64 = await readBundledAsset('samples/star-cafe-packaged.mnproj');
-  const prepared = await prepareProject(base64ToBytes(base64), 'Star-Cafe-packaged.mnproj', onProgress);
   return finalizePreparedProject(prepared, onProgress);
 }
 

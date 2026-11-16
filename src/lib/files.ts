@@ -89,17 +89,3 @@ export async function copyImageDirectory(uri: string, destination: string): Prom
   }
   return copyDirectoryIos(uri, destination);
 }
-
-/** Read a file bundled under `android/app/src/main/assets` (sample project only). */
-export async function readBundledAsset(path: string): Promise<string> {
-  return RNFS.readFileAssets(path, 'base64');
-}
-
-export async function hasBundledAsset(path: string): Promise<boolean> {
-  if (Platform.OS !== 'android') return false;
-  try {
-    return await RNFS.existsAssets(path);
-  } catch {
-    return false;
-  }
-}

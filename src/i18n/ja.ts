@@ -18,7 +18,7 @@ const ja: Record<MessageKey, string> = {
   'home.emptyHint':
     'KomaYomi プロジェクト（.mnproj）を開いて言語比較を始めましょう。',
   'home.openProject': 'プロジェクトを開く…',
-  'home.openSample': 'サンプルを開く',
+  'home.sampleSoon': 'サンプルプロジェクトは後日提供',
   'home.importing': 'プロジェクトを読み込み中…',
   'home.warnings': '読み込み時の注意',
   'home.deleteTitle': 'プロジェクトを削除しますか？',
@@ -29,7 +29,6 @@ const ja: Record<MessageKey, string> = {
   'home.pages': '{count} ページ',
   'home.volumes': '{count} 巻',
   'home.importedAt': '{date} に読み込み',
-  'home.sampleMissing': 'このビルドにはサンプルが含まれていません。',
 
   'library.volumes': '巻',
   'library.chapters': '話',

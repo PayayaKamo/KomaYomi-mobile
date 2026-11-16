@@ -16,7 +16,7 @@ const en = {
   'home.emptyHint':
     'Open a KomaYomi project (.mnproj) to start comparing languages.',
   'home.openProject': 'Open project…',
-  'home.openSample': 'Open sample project',
+  'home.sampleSoon': 'Sample project coming soon',
   'home.importing': 'Importing project…',
   'home.warnings': 'Import notes',
   'home.deleteTitle': 'Remove project?',
@@ -27,7 +27,6 @@ const en = {
   'home.pages': '{count} pages',
   'home.volumes': '{count} volumes',
   'home.importedAt': 'Imported {date}',
-  'home.sampleMissing': 'The sample project is not bundled in this build.',
 
   'library.volumes': 'Volumes',
   'library.chapters': 'Chapters',
