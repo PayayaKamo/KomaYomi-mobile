@@ -6,70 +6,117 @@
 
 **Read the same manga page in Japanese, Chinese and English — on your phone.**
 
-Native mobile edition of [KomaYomi](https://github.com/PayayaKamo/KomaYomi), a manga comparison
-reader for reading the same pages across several language versions. Projects open straight on the
-device, notes stay in a local database, and nothing is uploaded. This repository is an independent
-app; the desktop project and the static web build are not part of it.
+Native mobile edition of [KomaYomi](https://github.com/PayayaKamo/KomaYomi): pair the same page across
+language versions, compare it full-page or panel by panel, and keep Markdown notes locally. Projects
+open straight on the device, nothing is uploaded, and no account is needed. This repository is an
+independent app; the desktop edition and the browser build are separate projects.
 
-## Ecosystem
+## What it can do now
 
-KomaYomi ships as four separate repositories. They share the same project format, but each one is
-built for a different environment.
+- **Import** a `.mnproj` project with the system file picker.
+  - Packaged projects carry their page images inside the archive.
+  - Reference projects store image paths; pick the original volume folder once and the matching pages
+    are copied into app storage.
+- **Browse** volumes, chapters and page thumbnails.
+- **Compare reader**:
+  - one column per language, ordered by the project's `langOrder`;
+  - side-by-side or overlay layout;
+  - full page or a single panel, following the page's reading direction and explicit panel numbers;
+  - mask switch to hide languages; tap a language chip to toggle a column;
+  - pan follows the finger, pinch to zoom, double tap to reset;
+  - **Previous / Next panel** buttons that continue onto the neighbouring page instead of stopping at
+    the page edge.
+- **Original view**: the uncropped page for each language, one lane on phones and two on tablets,
+  with language tabs, per-pane pinch/pan, a live zoom ratio and a reset button.
+- **Panel detail**: open it by double-tapping the active panel or tapping **Open panel**; every
+  language shows the same crop enlarged, with **Previous / Next panel** and **Previous / Next page**
+  navigation across page boundaries.
+- **Deep links** restore a page, view or panel from a link, including on a cold start.
+- **Edit / Read** switch in the header: read-only mode is persisted and disables note editing,
+  imports and project removal in the UI.
+- **Per-page Markdown notes** stored in a local SQLite database (op-sqlite), not AsyncStorage. One
+  editor is reused for new and existing notes; the action reads **Add note** or **Save changes**.
+- **Interface** in English, Simplified Chinese and Japanese, following the system language with
+  English as the fallback.
+- A **demo project** is bundled in the Android build (`Open sample project`).
+
+## What it cannot do yet
+
+- No automatic panel detection: panels are taken from the project file, not detected on the phone.
+- No panel workbench: no manual panel editing, splitting, numbering or templates.
+- No annotation editing or rendering.
+- No plugins, WebDAV/remote storage or automatic backups.
+- No export (HTML, PNG, Word, PDF/print).
+- No multi-root library scanning or shared thumbnail cache.
+- Read-only mode is enforced in the UI only; there is no server process to reject writes.
+- No runnable HarmonyOS NEXT build yet (see [HarmonyOS NEXT](#harmonyos-next)).
+- iOS project files exist, but iOS was not built for this milestone (see [iOS](#ios)).
+
+## How to run
+
+### Requirements
+
+- Node.js >= 22.11 and npm.
+- Android: JDK 21, Android SDK (platform 37, build-tools 37, NDK 27.1, CMake 3.22), plus an emulator
+  or a USB device.
+- iOS: macOS with Xcode and CocoaPods.
+
+### Install and start
+
+```bash
+npm install
+npm start           # terminal 1: Metro
+npm run android     # terminal 2: build and install on an emulator or device
+```
+
+`npm run sample` regenerates the demo `.mnproj` archives; they are already committed, so this step is
+optional.
+
+On the home screen, tap **Open sample project** to import the bundled Star Cafe demo without touching
+device storage. To use your own project, copy a `.mnproj` file to the device and choose **Open
+project…**.
+
+### Android device or emulator
+
+Start an AVD in Android Studio (or connect a device with USB debugging enabled), confirm it is
+visible with `adb devices`, then run `npm run android`. The build targets `arm64-v8a`.
+
+### iOS
+
+On macOS:
+
+```bash
+cd ios && pod install && cd ..
+npm run ios
+```
+
+Open `ios/KomaYomiMobile.xcworkspace` in Xcode if you prefer to build from the IDE. A physical
+iPhone needs an Apple development team for signing. The iOS project is generated but was not built
+for this milestone.
+
+### Checks
+
+```bash
+npm run typecheck
+npm test
+npm run lint
+```
+
+## The four repositories
+
+KomaYomi ships as four repositories that share the same project format but target different
+environments.
 
 | Repository | Role | Current scope |
 | --- | --- | --- |
-| [KomaYomi](https://github.com/PayayaKamo/KomaYomi) | Desktop full edition (Electron + local server) | The complete feature set: import and multi-root scanning, automatic panel detection, the panel workbench (drag/resize, split, numbering, templates), align presets, annotations, plugins, WebDAV/backups, read-only enforcement on the server, and HTML/PNG/Word/print export. |
+| [KomaYomi](https://github.com/PayayaKamo/KomaYomi) | Desktop full edition (Electron + local server) | Import and multi-root scanning, automatic panel detection, panel workbench (drag/resize, split, numbering, templates), align presets, annotations, plugins, WebDAV/backups, server-side read-only, HTML/PNG/Word/print export. |
 | [KomaYomi-online](https://github.com/PayayaKamo/KomaYomi-online) | Browser-only edition | Open a `.mnproj` and read, annotate and export static HTML or PNG entirely in the browser; no server, works offline. |
-| **KomaYomi-mobile** (this repo) | React Native app for Android and iOS | Import a project, compare pages across languages (side by side, overlay, original page, panel detail), notes, deep links and a front-end read-only mode. |
-| [KomaYomi-docs](https://github.com/PayayaKamo/KomaYomi-docs) | Documentation site, generated by CI | Build artifacts pushed automatically from the desktop repository; do not edit by hand. Published at [payayakamo.github.io/KomaYomi-docs](https://payayakamo.github.io/KomaYomi-docs/). |
+| **KomaYomi-mobile** (this repo) | React Native app for Android and iOS | Import, compare across languages (side by side, overlay, original page, panel detail), notes, deep links, front-end read-only mode. |
+| [KomaYomi-docs](https://github.com/PayayaKamo/KomaYomi-docs) | Documentation site generated by CI | Build artifacts pushed automatically from the desktop repository; do not edit by hand. Published at [payayakamo.github.io/KomaYomi-docs](https://payayakamo.github.io/KomaYomi-docs/). |
 
-Compared with the desktop edition, the mobile app still lacks automatic panel detection, the panel
-editing/splitting/numbering workbench, annotations, plugins, WebDAV/remote storage, automatic
-backups, export (HTML, PNG, Word, PDF/print), multi-root library scanning and shared thumbnail
-caches. Read-only mode on mobile is enforced in the UI only, because the app has no server process
-to reject writes. Panels shown on mobile come from the project file instead of being detected on the
-device.
+## Details
 
-HarmonyOS NEXT is **not supported yet**: the [`harmony/`](harmony/) directory only contains a
-placeholder README, with no ArkTS pages, project files, dependencies or build configuration. Do not
-expect a runnable HarmonyOS build from this repository.
-
-## Current features
-
-- Import a `.mnproj` project with the system file picker.
-  - **Packaged** projects carry their page images inside the archive.
-  - **Reference** projects store image paths; the app asks for the original image folder once and
-    copies the matching pages into app storage so the project keeps working.
-- Browse volumes, chapters and page thumbnails.
-- Compare reader:
-  - one column per language in the project, ordered by the project's `langOrder`;
-  - side-by-side or overlay layout;
-  - full page or one panel at a time, following the page's reading direction and panel numbers;
-  - mask switch to hide languages (tap a language chip to toggle a column);
-  - pan follows the finger, pinch to zoom, double tap to reset;
-  - **prev/next panel** buttons that continue onto the neighbouring page instead of stopping at the
-    page edge.
-- Original view: the uncropped page for each language, one lane on phones and two on tablets, with
-  language tabs, per-pane pinch/pan, a live zoom ratio and a reset button.
-- Panel detail view: open it by double-tapping the active panel (or tapping **Open panel**); each
-  language shows the same crop enlarged, and **prev/next panel** plus **prev/next page** navigate
-  across pages.
-- Deep links: `komayomi://reader/<volume>/<chapter>/<page>/<compare|original>[/panel/<id>]` restores
-  the same page, view and panel on a cold start or while the app is running.
-- **Edit / Read** switch in the header: read-only mode is persisted and disables note editing,
-  project imports and project removal in the UI (there is no server to enforce it).
-- Per-page Markdown notes, stored in a local SQLite database (op-sqlite), not in AsyncStorage. A
-  single editor is reused for new and existing notes; the button reads **Add note** or **Save
-  changes** accordingly.
-- Interface in English, Simplified Chinese and Japanese, following the system language with English
-  as the fallback.
-- A demo project is bundled in the Android build (`Open sample project`).
-
-Not in this milestone: automatic panel detection (panels are taken from the project file),
-annotation editing/rendering, the panel workbench, WebDAV/remote storage, plugins, backup and
-export. There are intentionally no UI entry points for them yet.
-
-## Tech stack
+### Tech stack
 
 | Area | Choice |
 | --- | --- |
@@ -81,42 +128,50 @@ export. There are intentionally no UI entry points for them yet.
 | Gestures | `react-native-gesture-handler` 3 |
 | Archive | `fflate` |
 
-Shared pure logic from the desktop app is vendored with `scripts/sync-shared.mjs` (types, project
-migrations, formatting helpers, Markdown renderer). Do not edit files under `src/shared`; edit the
-desktop sources and re-run the script.
+### Project layout
 
-## Requirements
-
-- Node.js >= 22.11
-- npm
-- Android: JDK 21, Android SDK (platform 37, build-tools 37, NDK 27.1, CMake 3.22) and an emulator or
-  device
-- iOS: Xcode and CocoaPods on macOS (the iOS project is generated but was not built for this
-  milestone)
-
-## Run
-
-```bash
-npm install
-npm run sample   # regenerate the demo .mnproj archives (optional, committed already)
-
-# terminal 1
-npm start
-
-# terminal 2
-npm run android
+```
+App.tsx                     state-based navigation, deep links + database bootstrap
+src/shared/                 vendored pure logic from the desktop app
+src/types/project.ts        manifest / config / storage types
+src/lib/db.ts               SQLite schema and queries
+src/lib/projectImport.ts    .mnproj import (packaged and reference)
+src/lib/library.ts          manifest + images -> library view model
+src/lib/files.ts            RNFS helpers and SAF folder copy bridge
+src/lib/imageSize.ts        intrinsic image size cache for panel crops
+src/lib/panelGeometry.ts    panel geometry ported from the desktop app
+src/lib/deeplink.ts         custom-scheme reader routes (`komayomi://…`)
+src/lib/panelNavigation.ts  reading-order panel stepping across pages
+src/i18n/                   en / zh / ja catalogs and locale detection
+src/screens/                home, library, page grid, reader, panel detail, page notes
+src/components/             compare/original canvases, panel crop, zoom/pan surface, UI primitives
+scripts/                    shared-code sync and sample archive generator
+samples/                    generated demo .mnproj files
+harmony/                    HarmonyOS NEXT placeholder (future milestone)
 ```
 
-On the home screen tap **Open sample project** to import the bundled Star Cafe demo without touching
-device storage. To try your own project, copy a `.mnproj` file to the device and use **Open project…**.
+### Shared code
 
-Useful checks:
+Shared pure logic is vendored from the desktop app with `scripts/sync-shared.mjs` (types, project
+migrations, formatting helpers, Markdown renderer, reading-order helpers). Do not edit files under
+`src/shared`; change the desktop sources and re-run:
 
 ```bash
-npm run typecheck
-npm test
-npm run lint
+npm run sync:shared
 ```
+
+### Deep links
+
+The app registers the `komayomi` scheme on Android and iOS:
+
+```
+komayomi://reader/<volume>/<chapter>/<page>/<compare|original>[/panel/<id>]
+```
+
+Pages are 1-based in the link and converted to the app's zero-based index. A link opens the matching
+project, page and view; a `panel/<id>` suffix opens the panel detail view. Links are handled on a
+cold start and while the app is already running. If several imported projects contain the same
+volume and chapter ids, the first match is used.
 
 ### Reference projects
 
@@ -125,7 +180,7 @@ that contains the volume folders (the same root the project was exported against
 picked SAF tree is copied by the small `KomaFiles` native module; on iOS the folder is read through
 RNFS. If the folder is skipped, the project still opens with missing-image placeholders.
 
-## Releases
+### Releases
 
 Releases are built by [.github/workflows/release.yml](.github/workflows/release.yml). The workflow
 runs on every `v*` tag and can also be started by hand (`workflow_dispatch`). It builds the Android
@@ -151,35 +206,13 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-## Project layout
+### HarmonyOS NEXT
 
-```
-App.tsx                     state-based navigation, deep links + database bootstrap
-src/shared/                 vendored pure logic from the desktop app
-src/types/project.ts        manifest / config / storage types
-src/lib/db.ts               SQLite schema and queries
-src/lib/projectImport.ts    .mnproj import (packaged and reference)
-src/lib/library.ts          manifest + images -> library view model
-src/lib/files.ts            RNFS helpers and SAF folder copy bridge
-src/lib/imageSize.ts        intrinsic image size cache for panel crops
-src/lib/panelGeometry.ts    panel geometry ported from the desktop app
-src/lib/deeplink.ts         custom-scheme reader routes (`komayomi://…`)
-src/lib/panelNavigation.ts  reading-order panel stepping across pages
-src/i18n/                   en / zh / ja catalogs and locale detection
-src/screens/                home, library, page grid, reader, panel detail, page notes
-src/components/             compare/original canvases, panel crop, zoom/pan surface, UI primitives
-scripts/                    shared-code sync and sample archive generator
-samples/                    generated demo .mnproj files
-harmony/                    HarmonyOS NEXT placeholder (future milestone)
-```
+HarmonyOS NEXT is **not supported yet**. Support is planned as a separate milestone using Huawei's
+React Native for OpenHarmony (RNOH). The [`harmony/`](harmony/) directory only contains a placeholder
+README: there are no ArkTS pages, project files, dependencies or build configuration, so there is no
+runnable HarmonyOS build. See [harmony/README.md](harmony/README.md).
 
-## HarmonyOS NEXT
-
-HarmonyOS NEXT support is planned as a separate milestone using Huawei's React Native for OpenHarmony
-(RNOH). See [harmony/README.md](harmony/README.md). Today `harmony/` is a placeholder only: there
-are no ArkTS pages, project files, dependencies or build configuration, so there is no runnable
-HarmonyOS build.
-
-## License
+### License
 
 Same license as the KomaYomi desktop project: [MIT](LICENSE).
