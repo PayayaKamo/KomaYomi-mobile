@@ -17,6 +17,11 @@ independent app; the desktop edition and the browser build are separate projects
   - Packaged projects carry their page images inside the archive.
   - Reference projects store image paths; pick the original volume folder once and the matching pages
     are copied into app storage.
+- **Sample project** so a fresh install has something to read:
+  - the demo archive is downloaded once from a GitHub Release (about 65 MB), with progress, cancel
+    and retry;
+  - the archive is cached on the device, so the demo imports offline afterwards and survives being
+    removed from the library;
 - **Browse** volumes, chapters and page thumbnails.
 - **Compare reader**:
   - one column per language, ordered by the project's `langOrder`;
@@ -68,9 +73,9 @@ npm start           # terminal 1: Metro
 npm run android     # terminal 2: build and install on an emulator or device
 ```
 
-On Android the home screen shows a disabled **Sample project coming soon** button next to **Open
-project…**. A sample project will be provided later; to use your own project, copy a `.mnproj` file
-to the device and choose **Open project…**.
+The home screen shows **Open sample project** when no project is imported yet; it opens a demo
+library with three volumes in Japanese, Chinese and English. To use your own project, copy a
+`.mnproj` file to the device and choose **Open project…**.
 
 ### Android device or emulator
 
@@ -134,6 +139,7 @@ src/shared/                 vendored pure logic from the desktop app
 src/types/project.ts        manifest / config / storage types
 src/lib/db.ts               SQLite schema and queries
 src/lib/projectImport.ts    .mnproj import (packaged and reference)
+src/lib/sampleProject.ts    demo library download, cache and import
 src/lib/library.ts          manifest + images -> library view model
 src/lib/files.ts            RNFS helpers and SAF folder copy bridge
 src/lib/imageSize.ts        intrinsic image size cache for panel crops
@@ -176,6 +182,27 @@ When a reference `.mnproj` is imported, the app immediately opens a folder picke
 that contains the volume folders (the same root the project was exported against). On Android the
 picked SAF tree is copied by the small `KomaFiles` native module; on iOS the folder is read through
 RNFS. If the folder is skipped, the project still opens with missing-image placeholders.
+
+### Sample project
+
+The demo library is a packaged `.mnproj` with three volumes (Japanese, Chinese and English). It is
+**not** bundled in the APK: the archive is 65 MB of already-compressed page images, so shipping it
+would grow every download by roughly that amount. Instead:
+
+- The home screen shows **Open sample project** while no project is imported (and keeps the entry
+  afterwards so the demo can be reopened).
+- On the first tap the archive is downloaded from the
+  [`demo-library-v1`](https://github.com/PayayaKamo/KomaYomi-mobile/releases/tag/demo-library-v1)
+  release into `Documents/samples/demo-project-v1.mnproj`, with progress, cancel and retry. The
+  import then uses the same pipeline as a picked project, so Android unpacks natively and iOS falls
+  back to the JavaScript unzip.
+- Later taps reuse the cached archive, also offline, and reuse the imported project when it already
+  exists (fixed project id `demo-library`, shown with a **Sample** badge).
+- Removing the demo from the library deletes its images and notes but keeps the cached archive, so
+  reopening it needs no further download.
+
+To publish new demo content, bump `SAMPLE_ARCHIVE_FILE` in `src/lib/sampleProject.ts`, upload the
+archive to a new `demo-library-vN` release and update `SAMPLE_DOWNLOAD_URL` accordingly.
 
 ### Releases
 

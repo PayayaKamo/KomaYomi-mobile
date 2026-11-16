@@ -205,8 +205,9 @@ function findArchiveEntry(names: Set<string>, assetPath: string | undefined): st
 export async function prepareProject(
   source: PickedArchive,
   onProgress: ImportProgress = () => undefined,
+  overrides: { id?: string; name?: string } = {},
 ): Promise<PreparedProject> {
-  const id = makeId();
+  const id = overrides.id ?? makeId();
   const directory = projectDirectory(id);
   onProgress('reading', 0, 1);
   onProgress('extracting', 0, 1);
@@ -230,7 +231,7 @@ export async function prepareProject(
     }
     const pageDocs = await readPageDocs(contents, warnings);
 
-    const name = manifest.name?.trim() || source.name.replace(/\.mnproj$/i, '');
+    const name = overrides.name ?? (manifest.name?.trim() || source.name.replace(/\.mnproj$/i, ''));
     const images: StoredImage[] = [];
     const missing: string[] = [];
 

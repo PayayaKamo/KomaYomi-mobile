@@ -18,12 +18,19 @@ const ja: Record<MessageKey, string> = {
   'home.emptyHint':
     'KomaYomi プロジェクト（.mnproj）を開いて言語比較を始めましょう。',
   'home.openProject': 'プロジェクトを開く…',
-  'home.sampleSoon': 'サンプルプロジェクトは後日提供',
+  'home.sampleOpen': 'サンプルプロジェクトを開く',
+  'home.sampleHint':
+    'サンプルプロジェクトは初回のみ {size} をダウンロードします。以降はオフラインで使えます。',
+  'home.sampleDownloading': 'サンプルプロジェクトをダウンロード中… {received} / {total}',
+  'home.sampleDownloadingUnknown': 'サンプルプロジェクトをダウンロード中… {received}',
+  'home.sampleBadge': 'サンプル',
   'home.importing': 'プロジェクトを読み込み中…',
   'home.warnings': '読み込み時の注意',
   'home.deleteTitle': 'プロジェクトを削除しますか？',
   'home.deleteBody':
     '取り込んだコピーとノートを削除します。元の .mnproj は変更されません。',
+  'home.deleteSampleBody':
+    'サンプルプロジェクトとノートをライブラリから削除します。ダウンロード済みのコピーは残るため、再度ダウンロードせずに開けます。',
   'home.packaged': 'パッケージ',
   'home.reference': '参照',
   'home.pages': '{count} ページ',

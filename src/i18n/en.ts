@@ -16,12 +16,19 @@ const en = {
   'home.emptyHint':
     'Open a KomaYomi project (.mnproj) to start comparing languages.',
   'home.openProject': 'Open project…',
-  'home.sampleSoon': 'Sample project coming soon',
+  'home.sampleOpen': 'Open sample project',
+  'home.sampleHint':
+    'The sample project is downloaded once ({size}) and stays available offline afterwards.',
+  'home.sampleDownloading': 'Downloading the sample project… {received} / {total}',
+  'home.sampleDownloadingUnknown': 'Downloading the sample project… {received}',
+  'home.sampleBadge': 'Sample',
   'home.importing': 'Importing project…',
   'home.warnings': 'Import notes',
   'home.deleteTitle': 'Remove project?',
   'home.deleteBody':
     'The imported copy and its notes will be deleted. Your .mnproj file stays untouched.',
+  'home.deleteSampleBody':
+    'The sample project and its notes will be removed from the library. The downloaded copy stays cached, so you can reopen it without downloading again.',
   'home.packaged': 'Packaged',
   'home.reference': 'Reference',
   'home.pages': '{count} pages',

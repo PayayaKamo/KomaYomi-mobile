@@ -3,6 +3,22 @@
 All notable changes to KomaYomi Mobile are documented here. The version comes from `version` in
 `package.json`; release notes for the matching GitHub tag are generated from `.github/release-notes.md`.
 
+## [0.2.2] - 2026-11-17
+
+### Added
+
+- **Ready-to-read sample project**: the home screen offers **Open sample project**, which downloads
+  the 65 MB demo archive once from the `demo-library-v1` release (progress, cancel, retry), caches it
+  in the documents folder and imports it through the regular archive pipeline. The demo lives in its
+  own project row (`demo-library`), so it never replaces a user project, shows a **Sample** badge and
+  can be removed; removing it keeps the cached archive, so it reopens offline without downloading
+  again. Repeated taps open the existing import instead of importing twice.
+
+### Fixed
+
+- A fast double tap on **Open sample project** no longer starts two imports at once; both would have
+  unpacked into the same scratch directory and slowed the import down considerably.
+
 ## [0.2.1] - 2026-11-16
 
 ### Fixed

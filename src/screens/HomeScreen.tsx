@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StoredProject } from '../types/project';
 import { formatDate, t } from '../i18n';
 import { removeDirectory } from '../lib/files';
 import { importPickedProject, type ImportPhase } from '../lib/projectImport';
+import {
+  SampleCancelledError,
+  SAMPLE_APPROX_BYTES,
+  findSampleProject,
+  importSampleProject,
+  isSampleProject,
+  type SampleImport,
+  type SampleProgress,
+} from '../lib/sampleProject';
 import {
   Badge,
   Banner,
@@ -35,6 +44,15 @@ const phaseLabel = (phase: ImportPhase): string => {
   }
 };
 
+const formatSize = (bytes: number): string =>
+  bytes > 0 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : '0 MB';
+
+type SampleState =
+  | { status: 'idle' }
+  | { status: 'downloading'; received: number; total: number }
+  | { status: 'importing' }
+  | { status: 'error'; message: string };
+
 export function HomeScreen({
   projects,
   readOnly,
@@ -52,6 +70,15 @@ export function HomeScreen({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sample, setSample] = useState<SampleState>({ status: 'idle' });
+  const sampleImport = useRef<SampleImport | null>(null);
+  // `sample` state lags behind by one render, so a fast double tap needs its own guard:
+  // two imports would otherwise unpack into the same scratch directory.
+  const sampleRunning = useRef(false);
+
+  const demoProject = findSampleProject(projects);
+  const sampleBusy = sample.status === 'downloading' || sample.status === 'importing';
+  const showSample = projects.length === 0 || Boolean(demoProject);
 
   const runImport = async () => {
     if (busy || readOnly) return;
@@ -67,21 +94,93 @@ export function HomeScreen({
     }
   };
 
-  const confirmDelete = (project: StoredProject) => {
-    Alert.alert(t('home.deleteTitle'), t('home.deleteBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          deleteProjectRecord(project.id)
-            .then(() => removeDirectory(project.directory))
-            .then(() => onDelete(project))
-            .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
-        },
-      },
-    ]);
+  const handleSampleProgress = (progress: SampleProgress) => {
+    if (progress.kind === 'download') {
+      setSample({ status: 'downloading', received: progress.received, total: progress.total });
+    } else {
+      // Import events fire per file batch; only switch state once.
+      setSample((current) => (current.status === 'importing' ? current : { status: 'importing' }));
+    }
   };
+
+  /**
+   * Open the demo library: an existing import wins, otherwise the archive is downloaded
+   * once (when not cached) and imported through the regular archive pipeline.
+   */
+  const openSample = () => {
+    if (sampleRunning.current || sampleBusy) return;
+    if (demoProject) {
+      onOpen(demoProject);
+      return;
+    }
+    if (readOnly || busy) return;
+    setError(null);
+    sampleRunning.current = true;
+    setSample({ status: 'downloading', received: 0, total: 0 });
+    const handle = importSampleProject(handleSampleProgress);
+    sampleImport.current = handle;
+    handle.promise
+      .then((result) => {
+        sampleImport.current = null;
+        sampleRunning.current = false;
+        setSample({ status: 'idle' });
+        onImported(result.project);
+      })
+      .catch((reason: unknown) => {
+        sampleImport.current = null;
+        sampleRunning.current = false;
+        if (reason instanceof SampleCancelledError) {
+          setSample({ status: 'idle' });
+          return;
+        }
+        setSample({
+          status: 'error',
+          message: reason instanceof Error ? reason.message : String(reason),
+        });
+      });
+  };
+
+  const cancelSample = () => {
+    sampleImport.current?.cancel();
+    sampleImport.current = null;
+    sampleRunning.current = false;
+    setSample({ status: 'idle' });
+  };
+
+  const confirmDelete = (project: StoredProject) => {
+    const sampleProject = isSampleProject(project);
+    Alert.alert(
+      t('home.deleteTitle'),
+      t(sampleProject ? 'home.deleteSampleBody' : 'home.deleteBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () => {
+            deleteProjectRecord(project.id)
+              .then(() => removeDirectory(project.directory))
+              .then(() => onDelete(project))
+              .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
+          },
+        },
+      ],
+    );
+  };
+
+  const downloadPercent =
+    sample.status === 'downloading' && sample.total > 0
+      ? Math.min(100, Math.round((sample.received / sample.total) * 100))
+      : 0;
+  const downloadLabel =
+    sample.status === 'downloading'
+      ? sample.total > 0
+        ? t('home.sampleDownloading', {
+            received: formatSize(sample.received),
+            total: formatSize(sample.total),
+          })
+        : t('home.sampleDownloadingUnknown', { received: formatSize(sample.received) })
+      : '';
 
   return (
     <Screen>
@@ -105,13 +204,43 @@ export function HomeScreen({
             label={t('home.openProject')}
             onPress={() => runImport()}
             busy={Boolean(busy)}
-            disabled={readOnly}
+            disabled={readOnly || sampleBusy}
           />
-          {/* The bundled sample is being replaced; keep the slot until the new file ships. */}
-          {Platform.OS === 'android' ? (
-            <Button label={t('home.sampleSoon')} variant="secondary" onPress={() => undefined} disabled />
+          {showSample ? (
+            <Button
+              label={t('home.sampleOpen')}
+              variant="secondary"
+              onPress={openSample}
+              busy={sampleBusy}
+              disabled={Boolean(busy) || (readOnly && !demoProject)}
+            />
           ) : null}
         </View>
+
+        {showSample && !demoProject && !sampleBusy && sample.status !== 'error' ? (
+          <Text style={styles.sampleHint}>
+            {t('home.sampleHint', { size: formatSize(SAMPLE_APPROX_BYTES) })}
+          </Text>
+        ) : null}
+
+        {sample.status === 'downloading' ? (
+          <View style={styles.progress}>
+            <Text style={styles.busy}>{downloadLabel}</Text>
+            <View style={styles.track}>
+              <View style={[styles.fill, { width: `${downloadPercent}%` }]} />
+            </View>
+            <Button label={t('common.cancel')} variant="ghost" onPress={cancelSample} />
+          </View>
+        ) : null}
+
+        {sample.status === 'importing' ? <Text style={styles.busy}>{t('home.importing')}</Text> : null}
+
+        {sample.status === 'error' ? (
+          <View style={styles.sampleError}>
+            <Banner text={sample.message} tone="error" />
+            <Button label={t('common.retry')} variant="secondary" onPress={openSample} />
+          </View>
+        ) : null}
 
         {busy ? <Text style={styles.busy}>{busy}</Text> : null}
 
@@ -128,6 +257,7 @@ export function HomeScreen({
                 <Text style={styles.cardTitle} numberOfLines={1}>
                   {project.name}
                 </Text>
+                {isSampleProject(project) ? <Badge label={t('home.sampleBadge')} tone="accent" /> : null}
                 <Badge
                   label={project.storageMode === 'packaged' ? t('home.packaged') : t('home.reference')}
                   tone={project.storageMode === 'packaged' ? 'accent' : 'muted'}
@@ -168,7 +298,19 @@ const styles = StyleSheet.create({
   brand: { color: colors.text, fontSize: 32, fontWeight: '800', letterSpacing: -0.5 },
   tagline: { color: colors.textMuted, fontSize: 14 },
   actions: { gap: spacing.sm },
+  sampleHint: { color: colors.textMuted, fontSize: 12, lineHeight: 17 },
   busy: { color: colors.textMuted, fontSize: 12, textAlign: 'center' },
+  progress: { gap: spacing.sm, alignItems: 'stretch' },
+  track: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  fill: { height: '100%', backgroundColor: colors.accent },
+  sampleError: { gap: spacing.sm, alignItems: 'stretch' },
   sectionTitle: { color: colors.textMuted, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: spacing.sm },
   card: {
     backgroundColor: colors.surface,
