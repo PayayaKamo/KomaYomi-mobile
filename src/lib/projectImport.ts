@@ -6,7 +6,7 @@ import { migrateManifestV0, migratePageV0 } from '../shared/migrations';
 import type { LibraryConfig, ManifestImage, ProjectManifest, StoredImage } from '../types/project';
 import { buildLibrary } from './library';
 import { base64ToBytes, bytesToBase64 } from './base64';
-import { copyImageDirectory, fileUri, projectDirectory, ensureDir, writeBase64File } from './files';
+import { copyImageDirectory, fileUri, projectDirectory, ensureDir, archiveScratchDirectory, removeDirectory, extractArchive, writeBase64File } from './files';
 import { insertImages, insertPages, insertProject } from './db';
 
 export type ImportPhase = 'reading' | 'extracting' | 'images' | 'saving';
@@ -63,11 +63,72 @@ function normalizeManifest(raw: unknown): ProjectManifest {
   return manifest;
 }
 
-function readConfig(files: Record<string, Uint8Array>): LibraryConfig {
-  const key = Object.keys(files).find((name) => name === 'config/library.json' || name.endsWith('/config/library.json'));
+/**
+ * Unpacked archive access. Android extracts the zip natively, so only the small JSON
+ * files are read through JS and the images are moved on disk; the in-memory fallback
+ * keeps iOS (no native extractor) working with the previous approach.
+ */
+type ArchiveContents = {
+  names: string[];
+  text(name: string): Promise<string>;
+  /** Move one entry to `target` and return its size in bytes. */
+  materialize(name: string, target: string): Promise<number>;
+  dispose(): Promise<void>;
+};
+
+function archiveError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  return new Error(`Could not read the project archive: ${message}`);
+}
+
+async function openArchiveInMemory(archivePath: string): Promise<ArchiveContents> {
+  let files: Record<string, Uint8Array>;
+  try {
+    const base64 = await RNFS.readFile(archivePath, 'base64');
+    files = unzipSync(base64ToBytes(base64));
+  } catch (error) {
+    throw archiveError(error);
+  }
+  return {
+    names: Object.keys(files),
+    text: async (name) => strFromU8(files[name]),
+    materialize: async (name, target) => {
+      const entry = files[name];
+      // Drop the entry as soon as it is written so a large archive is not held twice.
+      delete files[name];
+      await writeBase64File(target, bytesToBase64(entry));
+      return entry.byteLength;
+    },
+    dispose: async () => undefined,
+  };
+}
+
+async function openArchive(archivePath: string, scratch: string): Promise<ArchiveContents> {
+  let entries: Awaited<ReturnType<typeof extractArchive>>;
+  try {
+    entries = await extractArchive(archivePath, scratch);
+  } catch (error) {
+    throw archiveError(error);
+  }
+  if (!entries) return openArchiveInMemory(archivePath);
+
+  const sizes = new Map(entries.map((entry) => [entry.name, entry.size]));
+  return {
+    names: [...sizes.keys()],
+    text: (name) => RNFS.readFile(`${scratch}/${name}`, 'utf8'),
+    materialize: async (name, target) => {
+      await RNFS.moveFile(`${scratch}/${name}`, target);
+      return sizes.get(name) ?? 0;
+    },
+    dispose: () => removeDirectory(scratch),
+  };
+}
+
+async function readConfig(contents: ArchiveContents): Promise<LibraryConfig> {
+  const key = contents.names.find((name) => name === 'config/library.json' || name.endsWith('/config/library.json'));
   if (!key) return {};
   try {
-    const parsed: unknown = JSON.parse(strFromU8(files[key]));
+    const parsed: unknown = JSON.parse(await contents.text(key));
     if (isRecord(parsed) && isRecord(parsed.data)) return parsed.data as LibraryConfig;
     return isRecord(parsed) ? (parsed as LibraryConfig) : {};
   } catch {
@@ -75,8 +136,8 @@ function readConfig(files: Record<string, Uint8Array>): LibraryConfig {
   }
 }
 
-function readPageDocs(files: Record<string, Uint8Array>, warnings: string[]): PageDoc[] {
-  const entries = Object.keys(files).filter((name) => name.includes('pages/') && name.endsWith('.json'));
+async function readPageDocs(contents: ArchiveContents, warnings: string[]): Promise<PageDoc[]> {
+  const entries = contents.names.filter((name) => name.includes('pages/') && name.endsWith('.json'));
   const docs: PageDoc[] = [];
   for (const name of entries) {
     const rel = name.slice(name.indexOf('pages/') + 'pages/'.length, -'.json'.length);
@@ -87,7 +148,7 @@ function readPageDocs(files: Record<string, Uint8Array>, warnings: string[]): Pa
       continue;
     }
     try {
-      const parsed = JSON.parse(strFromU8(files[name])) as Record<string, unknown>;
+      const parsed = JSON.parse(await contents.text(name)) as Record<string, unknown>;
       const normalized = Number(parsed.schemaVersion) >= 1 ? parsed : migratePageV0(parsed);
       const doc = normalized as unknown as PageDoc;
       doc.schemaVersion = 1;
@@ -107,8 +168,10 @@ function readPageDocs(files: Record<string, Uint8Array>, warnings: string[]): Pa
   return docs;
 }
 
-/** Read a picked `.mnproj` and return its bytes, or `null` when the user cancels. */
-export async function pickProjectArchive(): Promise<{ bytes: Uint8Array; name: string } | null> {
+export type PickedArchive = { path: string; name: string };
+
+/** Copy a picked `.mnproj` into the cache and return its local path, or `null` when the user cancels. */
+export async function pickProjectArchive(): Promise<PickedArchive | null> {
   try {
     const [picked] = await pick({ type: [types.allFiles], mode: 'import' });
     if (!picked?.uri) return null;
@@ -120,104 +183,114 @@ export async function pickProjectArchive(): Promise<{ bytes: Uint8Array; name: s
     if (!copy || copy.status !== 'success') {
       throw new Error(copy && 'copyError' in copy ? copy.copyError : 'Could not read the picked project.');
     }
-    const base64 = await RNFS.readFile(stripScheme(copy.localUri), 'base64');
-    return { bytes: base64ToBytes(base64), name };
+    return { path: stripScheme(copy.localUri), name };
   } catch (error) {
     if (isRecord(error) && error.code === 'OPERATION_CANCELED') return null;
     throw error;
   }
 }
 
+function findArchiveEntry(names: Set<string>, assetPath: string | undefined): string | undefined {
+  if (!assetPath) return undefined;
+  const normalized = assetPath.replace(/\\/g, '/');
+  if (names.has(normalized)) return normalized;
+  const fallback = `assets/${baseName(normalized)}`;
+  return names.has(fallback) ? fallback : undefined;
+}
+
 /**
- * Unpack an archive and prepare the project. Packaged images are written to disk
- * immediately; reference projects wait for `attachReferenceFolder`.
+ * Unpack an archive and prepare the project. Packaged images are moved next to the
+ * project; reference projects wait for `attachReferenceFolder`.
  */
 export async function prepareProject(
-  bytes: Uint8Array,
-  sourceFile: string,
+  source: PickedArchive,
   onProgress: ImportProgress = () => undefined,
 ): Promise<PreparedProject> {
-  onProgress('reading', 0, 1);
-  let files: Record<string, Uint8Array>;
-  try {
-    files = unzipSync(bytes);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Could not read the project archive: ${message}`);
-  }
-  const manifestEntry = files['manifest.json'];
-  if (!manifestEntry) {
-    throw new Error('manifest.json is missing. This file is not a KomaYomi project (.mnproj).');
-  }
-  let manifestRaw: unknown;
-  try {
-    manifestRaw = JSON.parse(strFromU8(manifestEntry));
-  } catch {
-    throw new Error('manifest.json is not valid JSON.');
-  }
-  const manifest = normalizeManifest(manifestRaw);
-  const config = readConfig(files);
-  const warnings: string[] = [];
-  if (manifest.storageMode === 'reference') {
-    warnings.push('This is a reference project. Pick its image folder to attach the original pages.');
-  }
-  const pageDocs = readPageDocs(files, warnings);
-
   const id = makeId();
   const directory = projectDirectory(id);
-  await ensureDir(`${directory}/assets`);
-  const name = manifest.name?.trim() || sourceFile.replace(/\.mnproj$/i, '');
-  const images: StoredImage[] = [];
-  const missing: string[] = [];
+  onProgress('reading', 0, 1);
+  onProgress('extracting', 0, 1);
+  const contents = await openArchive(source.path, archiveScratchDirectory(id));
 
-  if (manifest.storageMode === 'packaged') {
-    const total = manifest.inventory.images.length;
-    let done = 0;
-    for (const image of manifest.inventory.images) {
-      const assetPath = image.asset ?? '';
-      const entry = assetPath ? files[assetPath] ?? files[`assets/${baseName(assetPath)}`] : undefined;
-      if (!entry) {
-        missing.push(`${image.volume}/${image.chapter}/${image.name}`);
-      } else {
-        const assetName = baseName(assetPath) || `${image.volume}-${image.chapter}-${image.pageIndex}-${image.lang}`;
-        const localPath = `${directory}/assets/${assetName}`;
-        await writeBase64File(localPath, bytesToBase64(entry));
-        images.push({
-          projectId: id,
-          volume: image.volume,
-          chapter: image.chapter,
-          pageIndex: image.pageIndex,
-          lang: image.lang,
-          name: image.name,
-          localPath,
-          size: entry.byteLength,
-        });
-      }
-      done += 1;
-      if (done % 4 === 0 || done === total) onProgress('images', done, total);
+  try {
+    if (!contents.names.includes('manifest.json')) {
+      throw new Error('manifest.json is missing. This file is not a KomaYomi project (.mnproj).');
     }
-  }
+    let manifestRaw: unknown;
+    try {
+      manifestRaw = JSON.parse(await contents.text('manifest.json'));
+    } catch {
+      throw new Error('manifest.json is not valid JSON.');
+    }
+    const manifest = normalizeManifest(manifestRaw);
+    const config = await readConfig(contents);
+    const warnings: string[] = [];
+    if (manifest.storageMode === 'reference') {
+      warnings.push('This is a reference project. Pick its image folder to attach the original pages.');
+    }
+    const pageDocs = await readPageDocs(contents, warnings);
 
-  if (missing.length) {
-    warnings.push(
-      `${missing.length} image${missing.length === 1 ? '' : 's'} could not be found in the archive.`,
-    );
-  }
+    const name = manifest.name?.trim() || source.name.replace(/\.mnproj$/i, '');
+    const images: StoredImage[] = [];
+    const missing: string[] = [];
 
-  return {
-    id,
-    name,
-    storageMode: manifest.storageMode,
-    sourceFile,
-    importedAt: new Date().toISOString(),
-    directory,
-    manifest,
-    config,
-    pageDocs,
-    images,
-    missing,
-    warnings,
-  };
+    if (manifest.storageMode === 'packaged') {
+      await ensureDir(`${directory}/assets`);
+      const entries = new Set(contents.names);
+      const total = manifest.inventory.images.length;
+      let done = 0;
+      for (const image of manifest.inventory.images) {
+        const assetPath = image.asset ?? '';
+        const entryName = findArchiveEntry(entries, assetPath);
+        if (!entryName) {
+          missing.push(`${image.volume}/${image.chapter}/${image.name}`);
+        } else {
+          const assetName = baseName(assetPath) || `${image.volume}-${image.chapter}-${image.pageIndex}-${image.lang}`;
+          const localPath = `${directory}/assets/${assetName}`;
+          const size = await contents.materialize(entryName, localPath);
+          images.push({
+            projectId: id,
+            volume: image.volume,
+            chapter: image.chapter,
+            pageIndex: image.pageIndex,
+            lang: image.lang,
+            name: image.name,
+            localPath,
+            size,
+          });
+        }
+        done += 1;
+        if (done % 4 === 0 || done === total) onProgress('images', done, total);
+      }
+    }
+
+    if (missing.length) {
+      warnings.push(
+        `${missing.length} image${missing.length === 1 ? '' : 's'} could not be found in the archive.`,
+      );
+    }
+
+    return {
+      id,
+      name,
+      storageMode: manifest.storageMode,
+      sourceFile: source.name,
+      importedAt: new Date().toISOString(),
+      directory,
+      manifest,
+      config,
+      pageDocs,
+      images,
+      missing,
+      warnings,
+    };
+  } catch (error) {
+    // Do not leave a half-written project folder behind when parsing fails.
+    await removeDirectory(directory);
+    throw error;
+  } finally {
+    await contents.dispose();
+  }
 }
 
 function pickImageFile(
@@ -344,8 +417,7 @@ export async function importPickedProject(
 ): Promise<import('../types/project').ImportResult | null> {
   const archive = await pickProjectArchive();
   if (!archive) return null;
-  onProgress('extracting', 0, 1);
-  const prepared = await prepareProject(archive.bytes, archive.name, onProgress);
+  const prepared = await prepareProject(archive, onProgress);
   if (prepared.storageMode === 'reference') {
     await attachReferenceFolder(prepared, onProgress);
   }

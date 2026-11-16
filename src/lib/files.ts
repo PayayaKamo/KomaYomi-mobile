@@ -69,11 +69,30 @@ async function copyDirectoryIos(uri: string, destination: string): Promise<Copie
 
 type KomaFilesNative = {
   copyDirectory(uri: string, destination: string): Promise<CopiedFile[]>;
+  extractArchive?(archivePath: string, destination: string): Promise<{ path: string; entries: ExtractedEntry[] }>;
 };
 
 function nativeFiles(): KomaFilesNative | null {
   if (Platform.OS !== 'android') return null;
   return (NativeModules as Record<string, KomaFilesNative | undefined>).KomaFiles ?? null;
+}
+
+export type ExtractedEntry = { name: string; size: number };
+
+/** Scratch folder for one import; it lives in the cache directory and is removed afterwards. */
+export function archiveScratchDirectory(projectId: string): string {
+  return `${RNFS.CachesDirectoryPath}/import-${projectId}`;
+}
+
+/**
+ * Unpack a `.mnproj` with the Android `KomaFiles.extractArchive` native module, which runs
+ * the zip on a native thread. Returns `null` on platforms without that module (iOS).
+ */
+export async function extractArchive(archivePath: string, destination: string): Promise<ExtractedEntry[] | null> {
+  const files = nativeFiles();
+  if (!files?.extractArchive) return null;
+  const result = await files.extractArchive(archivePath, destination);
+  return result.entries;
 }
 
 /**
