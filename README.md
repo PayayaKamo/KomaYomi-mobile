@@ -207,11 +207,11 @@ them attached:
 To cut a release:
 
 ```bash
-npm version 0.2.0 --no-git-tag-version
-git commit -am "Bump version to 0.2.0"
+npm version 0.2.1 --no-git-tag-version
+git commit -am "Bump version to 0.2.1"
 git push
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 ### HarmonyOS NEXT

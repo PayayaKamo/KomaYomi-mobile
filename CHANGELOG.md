@@ -3,6 +3,15 @@
 All notable changes to KomaYomi Mobile are documented here. The version comes from `version` in
 `package.json`; release notes for the matching GitHub tag are generated from `.github/release-notes.md`.
 
+## [0.2.1] - 2026-11-16
+
+### Fixed
+
+- Importing a large project no longer freezes the app: archives are unpacked natively with a
+  streaming `ZipFile` into a temporary directory instead of going through the JavaScript layer. A
+  67.6 MB project drops from roughly 290 seconds to roughly 10 seconds. The 0.2.0 APK did not
+  include this fix, so 0.2.1 is the first published build with it.
+
 ## [0.2.0] - 2026-11-16
 
 ### Added
