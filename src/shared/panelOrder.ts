@@ -17,7 +17,11 @@ function median(nums: number[]): number {
  * directions), the groups follow the direction, and members follow the group axis.
  * Legacy `rtl`/`ltr` are horizontal aliases and `ttb` is a vertical alias.
  */
-export function sortReadingOrder<T>(items: T[], dir: ReadingDirection, getRect: (item: T) => PanelRect): T[] {
+export function sortReadingOrder<T>(
+  items: T[],
+  dir: ReadingDirection,
+  getRect: (item: T) => PanelRect = (item) => item as unknown as PanelRect,
+): T[] {
   const list = [...items];
   if (list.length < 2) return list;
 
@@ -58,9 +62,7 @@ export function sortReadingOrder<T>(items: T[], dir: ReadingDirection, getRect: 
     else rows.push([r]);
   }
   return rows.flatMap((g) =>
-    [...g]
-      .sort((a, b) => (isRightToLeft(dir) ? b.rect.x - a.rect.x : a.rect.x - b.rect.x))
-      .map((r) => r.item),
+    [...g].sort((a, b) => (isRightToLeft(dir) ? b.rect.x - a.rect.x : a.rect.x - b.rect.x)).map((r) => r.item),
   );
 }
 

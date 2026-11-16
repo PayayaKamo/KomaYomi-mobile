@@ -8,10 +8,10 @@
     "panelOrder.ts"
   ],
   "checksums": {
-    "types.ts": "13775 chars",
+    "types.ts": "15612 chars",
     "format.ts": "24017 chars",
     "migrations.ts": "5624 chars",
-    "markdown.ts": "8255 chars",
-    "panelOrder.ts": "4628 chars"
+    "markdown.ts": "8637 chars",
+    "panelOrder.ts": "4664 chars"
   }
 }
