@@ -69,9 +69,8 @@ npm run android     # terminal 2: build and install on an emulator or device
 ```
 
 On Android the home screen shows a disabled **Sample project coming soon** button next to **Open
-project…**: the previously bundled demo was removed and the slot stays as a placeholder until a new
-sample `.mnproj` ships. To use your own project, copy a `.mnproj` file to the device and choose
-**Open project…**.
+project…**. A sample project will be provided later; to use your own project, copy a `.mnproj` file
+to the device and choose **Open project…**.
 
 ### Android device or emulator
 
