@@ -15,6 +15,7 @@ type Props = {
   width: number;
   height: number;
   onToggleMask: (lang: Lang) => void;
+  onSingleTap: () => void;
   missingLabel: string;
 };
 
@@ -34,6 +35,7 @@ export function OriginalPage({
   width,
   height,
   onToggleMask,
+  onSingleTap,
   missingLabel,
 }: Props) {
   const columns = width >= 700 ? 2 : 1;
@@ -96,6 +98,7 @@ export function OriginalPage({
                 <ZoomPanView
                   resetKey={`${page.index}/${lang}/${resetNonce}`}
                   panEnabled={Boolean(zoomed[lang])}
+                  onSingleTap={onSingleTap}
                   onZoomChange={value =>
                     setZoomed(previous =>
                       previous[lang] === value

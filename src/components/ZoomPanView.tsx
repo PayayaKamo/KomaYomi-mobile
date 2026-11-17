@@ -2,6 +2,7 @@ import React, { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import {
   GestureDetector,
+  useExclusiveGestures,
   usePanGesture,
   usePinchGesture,
   useSimultaneousGestures,
@@ -23,6 +24,7 @@ export function ZoomPanView({
   onZoomChange,
   onScaleChange,
   onDoubleTap,
+  onSingleTap,
 }: {
   children: ReactNode;
   resetKey: string;
@@ -32,6 +34,8 @@ export function ZoomPanView({
   onScaleChange?: (scale: number) => void;
   /** Replaces the default double-tap-to-reset, e.g. to open the panel detail. */
   onDoubleTap?: () => void;
+  /** Runs after a single tap; double-tap actions always take priority. */
+  onSingleTap?: () => void;
 }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -42,7 +46,9 @@ export function ZoomPanView({
   const zoomedRef = useRef(false);
   const reportedScale = useRef(1);
   const doubleTapRef = useRef(onDoubleTap);
+  const singleTapRef = useRef(onSingleTap);
   doubleTapRef.current = onDoubleTap;
+  singleTapRef.current = onSingleTap;
 
   const reportZoom = (zoomed: boolean) => {
     if (zoomedRef.current === zoomed) return;
@@ -131,12 +137,17 @@ export function ZoomPanView({
     },
   });
 
+  const singleTap = useTapGesture({
+    numberOfTaps: 1,
+    onActivate: () => singleTapRef.current?.(),
+  });
+  const taps = useExclusiveGestures(doubleTap, singleTap);
   const transform = useSimultaneousGestures(pan, pinch);
 
   return (
     <GestureDetector gesture={transform}>
       <View style={styles.clip}>
-        <GestureDetector gesture={doubleTap}>
+        <GestureDetector gesture={taps}>
           <Animated.View
             style={[
               StyleSheet.absoluteFill,

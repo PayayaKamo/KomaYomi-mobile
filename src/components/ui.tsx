@@ -76,6 +76,7 @@ export function Button({
       <Text
         style={[
           styles.buttonLabel,
+          variant === 'secondary' && styles.buttonLabelSecondary,
           variant === 'ghost' && styles.buttonLabelGhost,
           variant === 'danger' && styles.buttonLabelDanger,
         ]}>
@@ -226,6 +227,7 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.45 },
   buttonPressed: { opacity: 0.78 },
   buttonLabel: { color: '#0b1020', fontSize: 15, fontWeight: '700' },
+  buttonLabelSecondary: { color: colors.text },
   buttonLabelGhost: { color: colors.accent },
   buttonLabelDanger: { color: colors.danger },
   chip: {

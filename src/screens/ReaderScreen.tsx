@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -16,6 +18,7 @@ import { ComparePage, type CompareMode } from '../components/ComparePage';
 import { OriginalPage } from '../components/OriginalPage';
 import { ZoomPanView } from '../components/ZoomPanView';
 import {
+  Button,
   Chip,
   EmptyState,
   Header,
@@ -96,6 +99,8 @@ export function ReaderScreen({
   const [masked, setMasked] = useState<Record<string, boolean>>({});
   const [current, setCurrent] = useState(initialPosition);
   const [zoomed, setZoomed] = useState(false);
+  const [chromeVisible, setChromeVisible] = useState(true);
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const [area, setArea] = useState({ width: 0, height: 0 });
   const [docs, setDocs] = useState<Record<string, PageDoc>>({});
   const listRef = useRef<FlatList<PageEntry>>(null);
@@ -231,6 +236,8 @@ export function ReaderScreen({
     onOpenPanel(pageIndex, activePanel.id);
   };
 
+  const toggleChrome = () => setChromeVisible(visible => !visible);
+
   if (!chapter || !pages.length) {
     return (
       <Screen>
@@ -250,152 +257,37 @@ export function ReaderScreen({
 
   return (
     <Screen>
-      <Header
-        title={chapter?.title ?? chapterId}
-        subtitle={t('reader.pageOf', {
-          page: Math.min(current, pages.length - 1) + 1,
-          total: pages.length,
-        })}
-        onBack={onBack}
-        right={
-          <View style={styles.headerActions}>
-            <ModeButton
-              readOnly={readOnly}
-              onToggle={() => onModeChange(readOnly ? 'edit' : 'read')}
-            />
-            <Pressable
-              onPress={() => onOpenNote(page.index)}
-              hitSlop={8}
-              style={styles.noteButton}
-            >
-              <Text style={styles.noteButtonText}>{t('reader.notes')}</Text>
-            </Pressable>
-          </View>
-        }
-      />
-
-      <View style={styles.controls}>
-        <View style={styles.controlRow}>
-          <View style={styles.segmented}>
-            <Segmented
-              value={view}
-              onChange={onViewChange}
-              options={[
-                { value: 'compare', label: t('reader.viewCompare') },
-                { value: 'original', label: t('reader.viewOriginal') },
-              ]}
-            />
-          </View>
-          <View style={styles.maskSwitch}>
-            <Text style={styles.maskLabel}>{t('reader.mask')}</Text>
-            <Switch
-              value={maskEnabled}
-              onValueChange={setMaskEnabled}
-              trackColor={{ false: colors.border, true: colors.accentSoft }}
-              thumbColor={maskEnabled ? colors.accent : colors.textMuted}
-            />
-          </View>
-        </View>
-        <View style={styles.langs}>
-          {languages.map(lang => (
-            <Chip
-              key={lang}
-              label={`${langName(lang)}`}
-              active={maskEnabled ? !masked[lang] : true}
-              onPress={() => toggleMask(lang)}
-              dotColor={
-                masked[lang] && maskEnabled ? colors.warning : colors.success
-              }
-            />
-          ))}
-        </View>
-
-        {view === 'compare' ? (
-          <>
-            <View style={styles.controlRow}>
-              <View style={styles.segmented}>
-                <Segmented
-                  value={mode}
-                  onChange={setMode}
-                  options={[
-                    { value: 'split', label: t('reader.modeSplit') },
-                    { value: 'overlay', label: t('reader.modeOverlay') },
-                  ]}
-                />
-              </View>
-              <View style={styles.segmented}>
-                <Segmented
-                  value={scope}
-                  onChange={next => {
-                    setScope(next);
-                    setPanelIndex(0);
-                  }}
-                  options={[
-                    { value: 'page', label: t('reader.scopePage') },
-                    { value: 'panel', label: t('reader.scopePanel') },
-                  ]}
-                />
-              </View>
-            </View>
-
-            <View style={styles.panelBar}>
+      {chromeVisible ? (
+        <Header
+          title={chapter?.title ?? chapterId}
+          subtitle={t('reader.pageOf', {
+            page: Math.min(current, pages.length - 1) + 1,
+            total: pages.length,
+          })}
+          onBack={onBack}
+          right={
+            <View style={styles.headerActions}>
               <Pressable
-                onPress={() => stepPanel(-1)}
-                disabled={!canStep(-1)}
+                onPress={() => onOpenNote(page.index)}
                 hitSlop={8}
-                style={[
-                  styles.panelButton,
-                  !canStep(-1) && styles.panelButtonDisabled,
-                ]}
-              >
-                <Text style={styles.panelButtonText}>
-                  {t('reader.prevPanel')}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  if (!currentPage || !orderedPanels.length) return;
-                  if (scope === 'page') {
-                    setScope('panel');
-                    setPanelIndex(0);
-                  } else {
-                    openPanel(currentPage.index);
-                  }
-                }}
-                disabled={!orderedPanels.length}
+                style={styles.noteButton}
                 accessibilityRole="button"
-                accessibilityLabel={t('reader.openPanel')}
-                style={styles.panelCountButton}
               >
-                <Text style={styles.panelCount}>
-                  {orderedPanels.length
-                    ? t('reader.panelOf', {
-                        panel: panelPosition,
-                        total: orderedPanels.length,
-                      })
-                    : t('reader.noPanels')}
-                </Text>
-                {scope === 'panel' && orderedPanels.length ? (
-                  <Text style={styles.panelOpen}>{t('reader.openPanel')}</Text>
-                ) : null}
+                <Text style={styles.noteButtonText}>{t('reader.notes')}</Text>
               </Pressable>
               <Pressable
-                onPress={() => stepPanel(1)}
-                disabled={!canStep(1)}
+                onPress={() => setSettingsVisible(true)}
                 hitSlop={8}
-                style={[
-                  styles.panelButton,
-                  !canStep(1) && styles.panelButtonDisabled,
-                ]}
+                style={styles.settingsButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('reader.settings')}
               >
-                <Text style={styles.panelButtonText}>
-                  {t('reader.nextPanel')}
-                </Text>
+                <Text style={styles.settingsButtonText}>⋯</Text>
               </Pressable>
             </View>
-          </>
-        ) : null}
-      </View>
+          }
+        />
+      ) : null}
 
       <View
         style={styles.pagerWrap}
@@ -411,9 +303,7 @@ export function ReaderScreen({
         {area.width > 0 && area.height > 0 ? (
           <FlatList
             ref={listRef}
-            key={`${chapterId}-${Math.round(area.width)}x${Math.round(
-              area.height,
-            )}`}
+            key={`${chapterId}-${Math.round(area.width)}`}
             data={pages}
             horizontal
             pagingEnabled
@@ -438,6 +328,7 @@ export function ReaderScreen({
                     width={area.width}
                     height={area.height}
                     onToggleMask={toggleMask}
+                    onSingleTap={toggleChrome}
                     missingLabel={t('reader.missing')}
                   />
                 </View>
@@ -446,6 +337,7 @@ export function ReaderScreen({
                   <ZoomPanView
                     resetKey={`${chapterId}/${item.index}/${mode}/${scope}/${panelIndex}`}
                     panEnabled={zoomed}
+                    onSingleTap={toggleChrome}
                     onZoomChange={setZoomed}
                     onDoubleTap={
                       scope === 'panel' &&
@@ -482,13 +374,202 @@ export function ReaderScreen({
         ) : null}
       </View>
 
-      <Text style={styles.hint}>
-        {view === 'original'
-          ? t('reader.originalHint')
-          : scope === 'panel'
-            ? t('reader.panelHint')
-            : t('reader.zoomHint')}
-      </Text>
+      {chromeVisible && view === 'compare' ? (
+        <View style={styles.panelBar}>
+          <Pressable
+            onPress={() => stepPanel(-1)}
+            disabled={!canStep(-1)}
+            hitSlop={8}
+            accessibilityRole="button"
+            style={[
+              styles.panelButton,
+              !canStep(-1) && styles.panelButtonDisabled,
+            ]}
+          >
+            <Text style={styles.panelButtonText}>
+              {t('reader.prevPanel')}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              if (!currentPage || !orderedPanels.length) return;
+              if (scope === 'page') {
+                setScope('panel');
+                setPanelIndex(0);
+              } else {
+                openPanel(currentPage.index);
+              }
+            }}
+            disabled={!orderedPanels.length}
+            accessibilityRole="button"
+            accessibilityLabel={t('reader.openPanel')}
+            style={styles.panelCountButton}
+          >
+            <Text style={styles.panelCount}>
+              {orderedPanels.length
+                ? t('reader.panelOf', {
+                    panel: panelPosition,
+                    total: orderedPanels.length,
+                  })
+                : t('reader.noPanels')}
+            </Text>
+            {scope === 'panel' && orderedPanels.length ? (
+              <Text style={styles.panelOpen}>{t('reader.openPanel')}</Text>
+            ) : null}
+          </Pressable>
+          <Pressable
+            onPress={() => stepPanel(1)}
+            disabled={!canStep(1)}
+            hitSlop={8}
+            accessibilityRole="button"
+            style={[
+              styles.panelButton,
+              !canStep(1) && styles.panelButtonDisabled,
+            ]}
+          >
+            <Text style={styles.panelButtonText}>
+              {t('reader.nextPanel')}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      <Modal
+        visible={settingsVisible}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setSettingsVisible(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setSettingsVisible(false)}
+            accessibilityLabel={t('common.close')}
+          />
+          <View style={styles.settingsSheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{t('reader.settings')}</Text>
+              <Pressable
+                onPress={() => setSettingsVisible(false)}
+                hitSlop={8}
+                accessibilityRole="button"
+              >
+                <Text style={styles.sheetClose}>{t('common.close')}</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={styles.sheetContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.settingSection}>
+                <Text style={styles.settingLabel}>{t('reader.view')}</Text>
+                <Segmented
+                  value={view}
+                  onChange={onViewChange}
+                  options={[
+                    { value: 'compare', label: t('reader.viewCompare') },
+                    { value: 'original', label: t('reader.viewOriginal') },
+                  ]}
+                />
+              </View>
+
+              {view === 'compare' ? (
+                <>
+                  <View style={styles.settingSection}>
+                    <Text style={styles.settingLabel}>
+                      {t('reader.compareLayout')}
+                    </Text>
+                    <Segmented
+                      value={mode}
+                      onChange={setMode}
+                      options={[
+                        { value: 'split', label: t('reader.modeSplit') },
+                        { value: 'overlay', label: t('reader.modeOverlay') },
+                      ]}
+                    />
+                  </View>
+                  <View style={styles.settingSection}>
+                    <Text style={styles.settingLabel}>
+                      {t('reader.navigationUnit')}
+                    </Text>
+                    <Segmented
+                      value={scope}
+                      onChange={next => {
+                        setScope(next);
+                        setPanelIndex(0);
+                      }}
+                      options={[
+                        { value: 'page', label: t('reader.scopePage') },
+                        { value: 'panel', label: t('reader.scopePanel') },
+                      ]}
+                    />
+                  </View>
+                </>
+              ) : null}
+
+              <View style={styles.settingInline}>
+                <Text style={styles.settingLabel}>{t('reader.mask')}</Text>
+                <Switch
+                  value={maskEnabled}
+                  onValueChange={setMaskEnabled}
+                  trackColor={{ false: colors.border, true: colors.accentSoft }}
+                  thumbColor={maskEnabled ? colors.accent : colors.textMuted}
+                />
+              </View>
+
+              <View style={styles.settingSection}>
+                <Text style={styles.settingLabel}>
+                  {t('reader.languages')}
+                </Text>
+                <View style={styles.langs}>
+                  {languages.map(lang => (
+                    <Chip
+                      key={lang}
+                      label={langName(lang)}
+                      active={maskEnabled ? !masked[lang] : true}
+                      onPress={() => toggleMask(lang)}
+                      dotColor={
+                        masked[lang] && maskEnabled
+                          ? colors.warning
+                          : colors.success
+                      }
+                    />
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.settingInline}>
+                <Text style={styles.settingLabel}>{t('reader.editMode')}</Text>
+                <ModeButton
+                  readOnly={readOnly}
+                  onToggle={() => onModeChange(readOnly ? 'edit' : 'read')}
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.sheetFooter}>
+              <Text style={styles.gestureHint}>{t('reader.chromeHint')}</Text>
+              <Text style={styles.gestureHint}>
+                {view === 'original'
+                  ? t('reader.originalHint')
+                  : scope === 'panel'
+                    ? t('reader.panelHint')
+                    : t('reader.zoomHint')}
+              </Text>
+              <Button
+                label={t('reader.hideControls')}
+                onPress={() => {
+                  setSettingsVisible(false);
+                  setChromeVisible(false);
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -499,43 +580,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-  controls: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
-  },
-  controlRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  segmented: { flex: 1 },
-  maskSwitch: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  maskLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
-  langs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  panelBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    paddingTop: spacing.xs,
-  },
-  panelButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  panelButtonDisabled: { opacity: 0.4 },
-  panelButtonText: { color: colors.text, fontSize: 12, fontWeight: '600' },
-  panelCountButton: { alignItems: 'center', gap: 1 },
-  panelCount: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
-  panelOpen: { color: colors.accent, fontSize: 10, fontWeight: '700' },
-  pagerWrap: { flex: 1, marginTop: spacing.xs },
-  hint: {
-    color: colors.textMuted,
-    fontSize: 11,
-    textAlign: 'center',
-    paddingVertical: spacing.sm,
-  },
   noteButton: {
     paddingHorizontal: spacing.md,
     paddingVertical: 7,
@@ -545,4 +589,91 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
   },
   noteButtonText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
+  settingsButton: {
+    width: 38,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  settingsButtonText: {
+    color: colors.text,
+    fontSize: 24,
+    lineHeight: 24,
+    marginTop: -7,
+  },
+  pagerWrap: { flex: 1 },
+  panelBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  panelButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  panelButtonDisabled: { opacity: 0.4 },
+  panelButtonText: { color: colors.text, fontSize: 12, fontWeight: '600' },
+  panelCountButton: { flex: 1, alignItems: 'center', gap: 1 },
+  panelCount: { color: colors.text, fontSize: 12, fontWeight: '600' },
+  panelOpen: { color: colors.accent, fontSize: 10, fontWeight: '700' },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: colors.overlay,
+  },
+  settingsSheet: {
+    maxHeight: '92%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  sheetClose: { color: colors.accent, fontSize: 13, fontWeight: '700' },
+  sheetScroll: { flexGrow: 0, flexShrink: 1 },
+  sheetContent: { padding: spacing.lg, gap: spacing.md },
+  settingSection: { gap: spacing.xs },
+  settingInline: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  settingLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
+  langs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  sheetFooter: {
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  gestureHint: { color: colors.textMuted, fontSize: 11, lineHeight: 16 },
 });
